@@ -27,6 +27,14 @@ Issue #47の[ML Agent Harness](https://github.com/jogi-hack-2026-team/jogi-hack-
 
 関連Issue：[旧`gh`方針 #10](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/10)、[GitHub MCPへの切り替え #28](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/28)
 
+## 変更に応じた補助Skillと検証
+
+個人環境のSkillは共有リポジトリへの導入済み一覧に含めない。利用時は実際の検出・本文・依存ツールを確認し、導入や権限追加は別の判断とする。既存の作業用Skillを優先し、`review-gate`／`pr-review`と同等の差分レビューに`find-bugs`を追加で実行しない。
+
+- UIは[変更対応表](docs/change-map.md)と[Webの依存・検証コマンド](apps/web/package.json)から対象を選ぶ。現行はReact＋Viteのため、Reactの補助指針からNext.js専用規則を持ち込まない。UX／a11y監査時は対象画面を限定し、重要導線・ブラウザ特有問題の確認では既存の実ブラウザ検証を優先する。
+- 予測・統計的主張・実験解釈を評価するときは[Product Spec](docs/product-spec.md)、Architectureの[Prediction Engine](docs/architecture.md#prediction-engine)と[Test Strategy](docs/architecture.md#test-strategy)、[実験・根拠の索引](docs/prediction/experiment-history.md)を先に読む。必要なら`scientific-critical-thinking`を補助に使う。P50／P80／Δとモデル仮定は正本に従い、数値テスト・合成比較の成功を実測に対する精度・校正・製品受入の証明にしない。
+- 小さな文書・文言修正は意味・参照・差分と既存の文書検証を基本とする。既存のレビューSkillが要求するUI変更の実ブラウザ確認など、プロジェクトの必須検証は維持し、重要な表示や挙動への影響に応じて追加する。設定点検や一般の報告書作成を完全セキュリティ監査の依頼と解釈しない。
+
 ## リポジトリで確認できる導入状況
 
 この表は2026-09-19の監査記録を基に、GitHub MCPは2026-09-23、ghは2026-10-03の個人環境の確認結果を併記したものです。全メンバーのPCへの導入を保証するものではありません。
