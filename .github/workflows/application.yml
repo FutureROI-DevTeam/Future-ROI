@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Node 24.21.0 は package.json engines・mise.toml・Dockerfile と同じ版。
-  NODE_VERSION: '24.21.0'
+  # Node 24.22.1 は package.json engines・mise.toml・Dockerfile と同じ版。
+  NODE_VERSION: '24.22.1'
   CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:

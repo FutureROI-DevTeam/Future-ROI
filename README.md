@@ -62,7 +62,7 @@ Invoke-RestMethod http://127.0.0.1:8080/api/health
 
 ## 検証
 
-Node.js 24.21.0 / npm 11.19.0 と開発依存を使用します。
+Node.js 24.22.1 / npm 11.19.0 と開発依存を使用します。
 
 ```powershell
 npm ci --include=dev

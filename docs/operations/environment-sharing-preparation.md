@@ -13,7 +13,7 @@ mise run --skip-tools check:staged
 
 `check`は文書と設定、`check:staged`はcommit対象の空白を検査する。Engineの数値テストやアプリ起動を実行するコマンドではない。miseがなければPowerShell 7で`pwsh -NoProfile -File scripts/check-foundation.ps1`、空白検査は`git diff --cached --check`を直接実行できる。
 
-#70で`mise.toml`にNode 24.21.0と`install`・`typecheck`・`test`・`build`・`dev:api`・`dev:web`のタスクを追加した。Engine CIのNode22.15.1/24系や単体Dockerの検証版を、そのまま製品版の決定にしない。DockerがあればEngine単体の検証にはhostへのmise/Node追加は不要。miseはツール版とタスクの入口を揃える役割で、Secret共有サービスの採択を代替しない。
+#70で`mise.toml`にNode 24.22.1と`install`・`typecheck`・`test`・`build`・`dev:api`・`dev:web`のタスクを追加した。Engine CIのNode22.15.1/24系や単体Dockerの検証版を、そのまま製品版の決定にしない。DockerがあればEngine単体の検証にはhostへのmise/Node追加は不要。miseはツール版とタスクの入口を揃える役割で、Secret共有サービスの採択を代替しない。
 
 ## 空の環境例と必要になる条件
 

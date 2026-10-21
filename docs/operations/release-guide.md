@@ -91,7 +91,7 @@ cloneはコードの取得、Set-Locationはそのrootへの移動、switchは�
 
 最初に `git status --short`、`git branch --show-current`、`git rev-parse HEAD`、`git rev-parse 'HEAD^{tree}'` を確認します。差分がある場合は保全して止め、別checkoutを使います。配備対象の新しいSHAは人間レビューを終えたmainから選び、PR HEADや古いSHAを自動採用しません。GitHub → Actionsで**同じSHA**のApplication／Foundationがsuccessであることを確認します。skip／pending／旧SHAの成功で代替しません。
 
-ローカルの必要版は [package.json](../../package.json)／[mise.toml](../../mise.toml) のNode **24.21.0**、npm **11.19.0**。`node --version`、`npm.cmd --version` で確認し、異なるなら環境担当へ相談します。Vercelは24.xのmajorを選び、minor／patchを固定できないため実build版も別に記録します。[公式Node対応](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions)
+ローカルの必要版は [package.json](../../package.json)／[mise.toml](../../mise.toml) のNode **24.22.1**、npm **11.19.0**。`node --version`、`npm.cmd --version` で確認し、異なるなら環境担当へ相談します。Vercelは24.xのmajorを選び、minor／patchを固定できないため実build版も別に記録します。[公式Node対応](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions)
 
 次は実行可能なローカル確認例です。**専用checkoutに `.env`・`.env.*`・`.local`・本番Secretを持ち込まず**、端末の環境変数にも実Secretがない新しいシェルでブロック全体を実行します。依存取得と生成物の書込みはありますが、DB CLI／cloud deployは呼びません。`npm.cmd` はWindowsのnpm入口です。
 

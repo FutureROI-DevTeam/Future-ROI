@@ -1,6 +1,6 @@
 # Runtime pin for the application (Refs #70). Documentation checks still run with --skip-tools.
 [tools]
-node = "24.21.0"
+node = "24.22.1"
 
 [tasks.check]
 description = "Check repository documentation and configuration (no application tests)"

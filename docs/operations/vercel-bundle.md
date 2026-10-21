@@ -18,7 +18,7 @@ Docker・常駐`server.ts`の起動と終了、migration、認証設定、FEソ�
 
 ## 秘密値・DB・クラウド操作なしの検証
 
-定義済みNode **24.21.0**をPATHの先頭に置き、repository rootで実行する。実`.env`を読み込まず、Vercel CLIのlogin/link/deployを呼ばない。
+定義済みNode **24.22.1**をPATHの先頭に置き、repository rootで実行する。実`.env`を読み込まず、Vercel CLIのlogin/link/deployを呼ばない。
 
 ```powershell
 npm ci --include=dev --ignore-scripts --no-audit --no-fund

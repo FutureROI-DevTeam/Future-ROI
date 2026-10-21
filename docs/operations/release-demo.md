@@ -11,7 +11,7 @@ migrationは`npm run db:migrate`（認証→アプリの順。コンテナ内は
 
 ### Secret不要のローカル確認
 
-新しい専用checkoutのrepository rootで、Node 24.21.0・npm 11.19.0を使う。`.env`を持ち込まず、既存DB・container・previewを使わない。以下は既存コマンドで、依存取得とbuild生成物の書込みを行うが、アプリserver・DB CLI・公開先を起動しない。
+新しい専用checkoutのrepository rootで、Node 24.22.1・npm 11.19.0を使う。`.env`を持ち込まず、既存DB・container・previewを使わない。以下は既存コマンドで、依存取得とbuild生成物の書込みを行うが、アプリserver・DB CLI・公開先を起動しない。
 
 ```powershell
 & {
@@ -96,7 +96,7 @@ root・entry・配備物のローカル準備は[#208のVercel候補手順](verc
 | --- | --- |
 | 無料条件・本人運用 | [無料運用の条件](../architecture.md#無料運用の条件)と実プラン・利用量・追加機能を照合し、非商用適合、公開Organization接続、commit作者と自動配備条件、管理共有の制限、上限時の停止／再開方法を記録する。非商用は無収益だけで判定しない。費用が生じる条件なら採用せず再検討 |
 | monorepo root・起動点 | [候補手順](vercel-bundle.md)どおりrepository rootの`package.json`／`package-lock.json`で3 workspaceの依存を解決し、実Projectのroot・build設定と生成物を照合する。[`app.ts`](../../apps/api/src/app.ts)は`buildApp` factory、[`server.ts`](../../apps/api/src/server.ts)は常駐用、[`vercel.ts`](../../apps/api/src/vercel.ts)は専用Function entry。指定したentryが実Functionに含まれ、`GET /api/health`がDB到達時200／到達不可時503を返すことを確認 |
-| Prediction build・exports・Node | `packages/prediction`→API／Webの順でbuildし、[`exports`](../../packages/prediction/package.json)の`dist/src/index.js`等とworkspace依存が公開bundleで解決することを確認。`predict`／`predictWithQuestionPrior`の両入口を実行する。公開Node 24.xの実minor／patchを記録し、ローカル24.21.0との互換性を確認 |
+| Prediction build・exports・Node | `packages/prediction`→API／Webの順でbuildし、[`exports`](../../packages/prediction/package.json)の`dist/src/index.js`等とworkspace依存が公開bundleで解決することを確認。`predict`／`predictWithQuestionPrior`の両入口を実行する。公開Node 24.xの実minor／patchを記録し、ローカル24.22.1との互換性を確認 |
 | SPA assets・`/api` | Webのbuild済みassetsが配信bundleへ入り、`/`・`/goals`・GoalのTodayへ直アクセス／再読込できる。hash付きassetsのcacheとindexの再検証を確認。存在しないassets・保護hook通過後の未知API／対象外methodはJSON 404になり、`/api`をSPA HTMLへfallbackしない。同一originでWebとAPIへ到達する。既に開いた旧SPAがある更新では、[SPA/API更新の互換境界](#spaapi更新の互換境界192)も確認する |
 | HTTPS・認証・全Set-Cookie | 公開HTTPSの`BETTER_AUTH_URL`と実URLを一致させ、登録→ログイン→再読込→ログアウト→再ログインを3人の端末で確認。全Set-Cookieが欠落・結合されず転送され、Secure・`__Secure-`・HttpOnly・SameSite=Lax、Origin拒否と他userのGoal／記録の分離が保たれる |
 | IP・認証レート制限 | proxyの転送ヘッダーの実形式とhop数を記録し、`TRUST_PROXY_HOPS`とクライアントIPの一致を確認。偽装ヘッダーで回数制限を回避できず、複数Function instance／再起動でもDB上の制限・Retry-Afterが整合すること、共有回線で3人が正当に使えることを確認 |

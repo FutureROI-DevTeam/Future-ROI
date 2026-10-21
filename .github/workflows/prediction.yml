@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22.15.1', '24.x']
+        node: ['22.23.4', '24.22.1']
     defaults:
       run:
         working-directory: packages/prediction
@@ -43,7 +43,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          # Verification versions. The product runtime pin (24.21.0) lives in package.json engines / mise.toml (#70).
+          # Verification versions. The product runtime pin (24.22.1) lives in package.json engines / mise.toml (#70).
           node-version: ${{ matrix.node }}
           package-manager-cache: false
       - name: Install locked verification dependency from the workspace lockfile
