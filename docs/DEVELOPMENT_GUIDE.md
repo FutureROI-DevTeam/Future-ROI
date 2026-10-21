@@ -482,7 +482,7 @@ miseがない場合は、リポジトリのルートで`pwsh -NoProfile -File sc
 
 ## アプリを起動・検証する
 
-#70で導入した起動構成です。[Architecture D-23](architecture.md#d-23)の基本構成に、Node 24.21.0（[mise.toml](../mise.toml)・[package.json](../package.json)の`engines`・[Dockerfile](../Dockerfile)で同じ版）を固定しています。APIは`GET /api/health`（DB接続確認を含む）、認証（#75）、Goal API（#76。[実装案](architecture.md#2026-10-06のgoal-api76)）、記録とToday API（#77。[実装案](architecture.md#2026-10-06の記録today-api77)。`/today`が純粋Engineを呼びます）まで、Webは起動確認と登録・ログイン画面までです。Goal・記録・Todayの画面は未実装です。
+#70で導入した起動構成です。[Architecture D-23](architecture.md#d-23)の基本構成に、Node 24.22.1（[mise.toml](../mise.toml)・[package.json](../package.json)の`engines`・[Dockerfile](../Dockerfile)で同じ版）を固定しています。APIは`GET /api/health`（DB接続確認を含む）、認証（#75）、Goal API（#76。[実装案](architecture.md#2026-10-06のgoal-api76)）、記録とToday API（#77。[実装案](architecture.md#2026-10-06の記録today-api77)。`/today`が純粋Engineを呼びます）まで、Webは起動確認と登録・ログイン画面までです。Goal・記録・Todayの画面は未実装です。
 
 | 構成 | 場所 | 役割 |
 | --- | --- | --- |
@@ -523,11 +523,11 @@ DBだけを再起動した際はappが一時的に503になることがありま
 
 Docker一式はビルド済みSPA/APIとDB、起動順・認証Cookie・migration・終了処理をまとめて確認する経路です。ソースをbind mountしないため、変更反映には再buildが必要です。日常の編集では次のhost起動を使い、Viteの画面更新とNodeのwatchで変更を早く確認します。Compose appとhost開発は別port・別認証originを使うため、同じ開発DBを使う場合も同時migrationを意図なく走らせないでください。
 
-miseはhostのNode 24.21.0を固定し、`install`・`typecheck`・`test`・`build`・`dev:*`で既存npmコマンドを呼ぶ道具です。DockerはOS・Runtime・依存・配信とDBの実行環境を再現します。DockerfileとCIはmiseを呼ばず、imageとsetup-nodeで同じNodeを固定し、lockfileからnpm ciします。
+miseはhostのNode 24.22.1を固定し、`install`・`typecheck`・`test`・`build`・`dev:*`で既存npmコマンドを呼ぶ道具です。DockerはOS・Runtime・依存・配信とDBの実行環境を再現します。DockerfileとCIはmiseを呼ばず、imageとsetup-nodeで同じNodeを固定し、lockfileからnpm ciします。
 
 ### 準備
 
-Node 24.21.0を使います。miseなら`mise install`で導入でき、`mise run install`等のタスクも使えます。DockerはローカルでPostgreSQL・コンテナを起動する場合だけ必要です。
+Node 24.22.1を使います。miseなら`mise install`で導入でき、`mise run install`等のタスクも使えます。DockerはローカルでPostgreSQL・コンテナを起動する場合だけ必要です。
 
 ```sh
 npm ci

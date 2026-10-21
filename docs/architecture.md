@@ -77,7 +77,7 @@ packages/prediction/    src/{index,types,predict,observations,recovery,completio
 apps/api/               src/{server,container-start,app,config}.ts, src/{contracts,db,http,auth,goals,logs,prediction}/, migrations/, tests/
 apps/web/               src/{main,router}.tsx, src/routes/, src/api/（#70。認証・起動確認画面）。src/ui/（デザイントークン・共通部品）、src/features/（画面ごとの部品）、src/copy/（画面の文言）、src/api/http.ts・goals-http.ts・today-http.ts（実APIの呼び出し）は#81（[ui/README](../apps/web/src/ui/README.md)）。src/features/goals/（Goalの一覧・作成・編集・削除）は#78
 compose.yaml            ローカルDB＋単一SPA/APIコンテナ。dbだけのhost開発も可能
-Dockerfile              単一SPA／APIコンテナ（Node 24.21.0）
+Dockerfile              単一SPA／APIコンテナ（Node 24.22.1）
 ```
 
 ## Technology Stack
@@ -124,6 +124,10 @@ API成功DTO・status・PATCH・昨日の既存記録変更・unit編集はこ�
 
 この採択に含めるもの：上表の版・runner・ローカルDB・配信／終了・入力検証と共通エラー形式（422／404のenvelope `{ error: { code, message, fields? } }`とDB制約違反の変換）。含めないもの：migrationツール、認証ライブラリの版（#74・#75）、公開先（D-25）、業務APIの成功DTO・status・PATCH等の細則。stagingへの配置は公開先の承認待ちで、#70の該当項目は#75へ移管する。手順は[開発ガイド](DEVELOPMENT_GUIDE.md#アプリを起動検証する)を参照する。
 
+### 2026-10-21のNodeセキュリティ更新
+
+[#308](https://github.com/FutureROI-DevTeam/Future-ROI/issues/308)で、製品の24系を維持してNode 24.22.1へ更新する。現行の`engines`・mise・Docker build/runtime・Application／Foundation／配備ツールのCI指定を揃える。予測検証の22系は22.23.4、24系は24.22.1とし、検証Dockerのdigestも更新する。上記2026-10-06の版と既存測定値は当時の履歴で、新版での再現確認は今回のPRへ記録する。公開サービスの実稼働Nodeは別途確認が必要で、この変更だけで本番反映済みと扱わない。
+
 ### Docker一式起動の補完（#130）
 
 既存D-23の単一SPA/API＋PostgreSQLを維持し、ローカルComposeの既定をDBのみから一式へ補完する。ユーザーの「全部起動できる状態まで、理由付きで」という依頼に対応する実装案であり、#130のレビュー・main反映で受け入れる。D-24/D-25の条件、Product要件・既存Hard依存は変更しない。[具体的な起動・復旧手順](DEVELOPMENT_GUIDE.md#dockerで一式を起動する)を参照する。
@@ -136,7 +140,7 @@ API成功DTO・status・PATCH・昨日の既存記録変更・unit編集はこ�
 | ローカル専用envとloopback公開 | Secretはユーザーが設定し、固定値・自動生成で永続credentialを作らない。DB passwordはURIへ埋め込まずPGPASSWORDで渡す。HTTP許可はloopback Composeだけ。既存project名/volumeを維持し、再作成や停止でデータを削除しない |
 | Docker確認とhost watchを併用 | Dockerだけにhost編集の速度を求めるとbind mountやdev専用imageが増える。既存host Node/Vite watchを日常編集、Dockerのビルド済みSPA/APIを配信・起動順・認証・終了の確認に使う。FE/APIを別配備サービスにすると同一origin/Cookieの方針と起動単位が増えるため採用しない |
 
-miseはhost Node 24.21.0の固定とnpmタスクの入口。DockerfileはNode image、CIはsetup-nodeで同じRuntimeを固定し、miseを実行しない。新しい依存・migrationツール・cloudリソースは追加しない。migration待ちが長くなる運用や複数配備単位が必要になった場合は、外部migration jobへの分離を再検討する。公開環境のDDL実行方針・権限設計は#83のレビューで決めるため、自動migrationはComposeのcommand上書きでローカル経路だけへ接続する。imageの既定CMDは`node apps/api/dist/server.js`で、直接使用する場合は事前にmigrationを成功させる必要がある。
+miseはhost Node 24.22.1の固定とnpmタスクの入口。DockerfileはNode image、CIはsetup-nodeで同じRuntimeを固定し、miseを実行しない。新しい依存・migrationツール・cloudリソースは追加しない。migration待ちが長くなる運用や複数配備単位が必要になった場合は、外部migration jobへの分離を再検討する。公開環境のDDL実行方針・権限設計は#83のレビューで決めるため、自動migrationはComposeのcommand上書きでローカル経路だけへ接続する。imageの既定CMDは`node apps/api/dist/server.js`で、直接使用する場合は事前にmigrationを成功させる必要がある。
 
 Evidenceは[Compose検証](../scripts/smoke-compose.sh)と[Application CI](../.github/workflows/application.yml)。空のenv-file/別project/合成DBで起動・反復・restart、履歴不一致/設定不足の配信抑止、API/SPA/認証、正常終了、volumeとデータ保持を確認する。既存runnerのtransaction rollback・lock待ちは[回帰](../apps/api/tests/migrate.test.ts)・[pool責務テスト](../apps/api/tests/pool-responsibility.test.ts)で確認する。実行結果は#130/PRへ記録し、テストコードの存在を実行済み証拠としない。
 
@@ -664,7 +668,7 @@ R-10の主要Flowを公開URLから使えるようにし、3人で機能QAを行
 
 ### 公開ランタイムの残条件
 
-Dockerを廃止せず、開発・再現・配信の確認に使う。公開は常駐NodeコンテナではなくFluid Functionで、休止・多instance・配信経路が異なる。[Node 24.xは対応するがmajorのみ選択でき、minor／patchは更新される](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions)。ローカルの24.21.0を公開でも厳密に固定できるとは扱わず、実際のbuild／runtime版と互換性を記録する。
+Dockerを廃止せず、開発・再現・配信の確認に使う。公開は常駐NodeコンテナではなくFluid Functionで、休止・多instance・配信経路が異なる。[Node 24.xは対応するがmajorのみ選択でき、minor／patchは更新される](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions)。ローカルの24.22.1を公開でも厳密に固定できるとは扱わず、実際のbuild／runtime版と互換性を記録する。
 
 [`server.ts`](../apps/api/src/server.ts)が作る2つの`pg` pool（アプリ用5＋認証用2）について、[Vercelのpool lifecycleの説明](https://vercel.com/kb/guide/connection-pooling-with-functions)に従い休止前のidle接続解放・復帰・多instance時の総接続数を検証する。常駐サーバーのSIGTERM処理だけでは関数の休止を検証したことにならない。認証用の安全なbigint（`int8`）parser、アプリ用の文字列型、切断時の処理とtimeoutを保全し、単一poolやグローバルparserへ統合しない。[Neonのtransaction poolerはsession advisory lockを扱えない](https://neon.com/docs/connect/connection-pooling)ため、migrationはHTTP用poolと別の実行で**直結URL**を使い、transaction poolerへ流さない。現行runnerの認証→アプリ順・checksum・transaction・session lockを保つ。接続値や設定の変更は今回行わない。
 

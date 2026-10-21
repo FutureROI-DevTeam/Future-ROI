@@ -1,6 +1,6 @@
-# CIで検証済みのNode版。製品runtimeや配備用imageの採択ではない（製品runtimeはroot Dockerfile参照）。
+# CI用の検証Node版。製品runtimeや配備用imageの採択ではない（製品runtimeはroot Dockerfile参照）。
 # build contextはrepositoryのroot。workspaceのlockfileからprediction packageの検証依存だけを取得する。
-FROM docker.io/library/node:22.15.1-bookworm-slim@sha256:ec318fe0dc46b56bcc1ca42a202738aeb4f3e347a7b4dd9f9f1df12ea7aa385a
+FROM docker.io/library/node:22.23.4-bookworm-slim@sha256:5991875dfb80938dd8a6ba3fe3e96fd04929e70792762b3319d8caadbbe229bc
 
 WORKDIR /work
 RUN chown node:node /work

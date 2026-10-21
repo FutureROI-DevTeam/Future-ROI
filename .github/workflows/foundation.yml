@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: '24.21.0'
+  NODE_VERSION: '24.22.1'
   CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:

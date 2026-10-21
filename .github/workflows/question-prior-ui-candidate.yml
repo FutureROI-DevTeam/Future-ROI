@@ -35,7 +35,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           # Verification host only, not the #70 production runtime decision.
-          node-version: '24.21.0'
+          node-version: '24.22.1'
           package-manager-cache: false
       - name: Install existing locked verification dependencies
         run: |

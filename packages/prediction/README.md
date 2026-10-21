@@ -98,7 +98,7 @@ numeric回答または実際の起点遷移が材料。UNKNOWN/nullは共通Beta
 
 [prediction.yml](../../.github/workflows/prediction.yml)は、`packages/prediction/**`またはこのworkflowが変わるPR、mainへのpush、手動実行を対象にする。Foundation CIは別に維持する。PRではGitHubのmerge用commitをcheckoutして基底branchとの組み合わせを検証する。候補adapterの独立CDFオラクル3件と18例の再現JSONもNode matrixで確認し、実験フォルダの変更をCI対象に含める。同じPR／branchの古い実行は取り消し、各jobは10分で打ち切る。read-only permissions・checkout credentials非保持で、Secret・DB・`pull_request_target`は使わない。fork PRも同じ構成で、GitHub側の実行承認が必要な場合はその制限に従う。
 
-Ubuntu runnerで、Node 22.15.1とNode 24系（`24.x`）のmatrixを使い、TypeScript 5.9.3（root lockfileで固定）を使う。Node 24系は採用候補での回帰検出を目的に追加し、24.xが解決した実版は各Actionsログで確認する。一方の失敗でももう一方の検証結果を得るためfail-fastは無効にする。これらは検証版で、製品runtimeの最終採択ではない。root `package-lock.json`には公式npm registryの配布先とintegrityを含め、`npm ci --workspace=@futureroi/prediction --include=dev --ignore-scripts --no-audit --no-fund`でこのpackageの検証依存だけをinstallする。lifecycle scriptsとcacheは使わない。
+Ubuntu runnerで、Node 22.23.4とNode 24.22.1のmatrixを使い、TypeScript 5.9.3（root lockfileで固定）を使う。Node 24系は採用候補での回帰検出を目的に追加し、各Actionsログで実行版を確認する。一方の失敗でももう一方の検証結果を得るためfail-fastは無効にする。これらは検証版で、製品runtimeの最終採択ではない。root `package-lock.json`には公式npm registryの配布先とintegrityを含め、`npm ci --workspace=@futureroi/prediction --include=dev --ignore-scripts --no-audit --no-fund`でこのpackageの検証依存だけをinstallする。lifecycle scriptsとcacheは使わない。
 
 同じ手順をローカルで再現する場合は、repoのルートで次を実行する。初回installには公式npm registryへの接続が必要で、Secret・DBは不要。
 

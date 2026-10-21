@@ -1,7 +1,7 @@
 # 単一コンテナ: Fastify APIがビルド済みSPAを同一originで配信する（Architecture D-23）。
-# 版固定: Node 24.21.0（package.json engines・mise.tomlと同じ）。
+# 版固定: Node 24.22.1（package.json engines・mise.tomlと同じ）。
 
-FROM node:24.21.0-bookworm-slim AS build
+FROM node:24.22.1-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
@@ -13,7 +13,7 @@ COPY apps ./apps
 COPY packages ./packages
 RUN npm run build
 
-FROM node:24.21.0-bookworm-slim AS runtime
+FROM node:24.22.1-bookworm-slim AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080 WEB_DIST=/app/apps/web/dist
 WORKDIR /app
 COPY package.json package-lock.json ./
