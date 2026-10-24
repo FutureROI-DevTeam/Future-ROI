@@ -39,6 +39,13 @@ function setupSessionTransport() {
     if (new URL(url, location.href).pathname === '/api/evaluation' && (!init?.method || init.method === 'GET')) {
       return Response.json({ enabled: false, policyVersion: 'self-evaluation-v1', retentionDays: 90, maxSnapshots: 90, observationDays: 30 });
     }
+    const authPath = new URL(url, location.href).pathname;
+    if (state.allowAuthActions && init?.method === 'POST' && ['/api/auth/sign-up/email', '/api/auth/sign-in/email'].includes(authPath)) {
+      state.writes++;
+      state.authCalls.push(authPath);
+      state.owner = 'A';
+      return Response.json({ token: 'synthetic-test-token', user: { id: 'A', name: 'Synthetic A', email: 'A@example.invalid', emailVerified: true, createdAt: '2026-10-09T00:00:00Z', updatedAt: '2026-10-09T00:00:00Z' } });
+    }
     if (state.allowSignOut && new URL(url, location.href).pathname === '/api/auth/sign-out' && init?.method === 'POST') {
       state.signOutCalls++;
       if (state.signOutHold) await new Promise((resolve) => state.signOutHeld.push(resolve));
@@ -158,6 +165,15 @@ test('#146 routes: signed-out/signed-in/reset pause/unreachable/404/error move a
   const result = await runBrowser(t, './routes.browser.tsx', false, true);
   assert.equal(result.results.length, 9);
   assert.equal(result.writes, 0);
+  t.diagnostic(JSON.stringify(result));
+});
+
+test('#265 auth targets: register ignores the target after session confirmation; login and AuthPage success preserve their contracts', { timeout: 180000 }, async (t) => {
+  const result = await runBrowser(t, './auth-targets.browser.tsx', false, true);
+  assert.equal(result.targets, 9);
+  assert.equal(result.goalReads, 0);
+  assert.deepEqual(result.authCalls, ['/api/auth/sign-up/email', '/api/auth/sign-in/email']);
+  assert.equal(result.writes, 2);
   t.diagnostic(JSON.stringify(result));
 });
 

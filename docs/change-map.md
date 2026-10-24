@@ -93,6 +93,10 @@ FEの「整合snapshot」は別GET間の日付・設定・回答版・累計・�
 | 旧音楽案の機能・実験 | 履歴のみ | [保管場所](../README.md#廃止した音楽案の履歴) | — |
 | 私的APIのHTTP保存禁止（#153） | [認証実装の方式](architecture.md#2026-10-06の認証実装75)。成功・失敗ともno-store、health／SPA／assetsの既存方針を保持 | [app.ts](../apps/api/src/app.ts)の共通応答hook・router拒否、[apiBoundary](../apps/api/src/http/api-boundary.ts)の既存分類。FE cache消去と本番proxy/CDNの受入とは別 | [cache-control.test.ts](../apps/api/tests/cache-control.test.ts)（Goal／Log／Today旧・r11、auth、401／403／404／422／500、所有者8ケースとDB不変、Cookie）、[auth.test.ts](../apps/api/tests/auth.test.ts)、[spa.test.ts](../apps/api/tests/spa.test.ts)。公開先は未検証 |
 
+### 認証画面の戻り先（#265）
+
+[P-16の明確化](product-spec.md#p-16-公開トップからgoalへ進める最小入口接続)に従い、[router.tsx](../apps/web/src/router.tsx)のlogin/register各beforeLoadが同じsession確認関数を使い、[afterAuthTarget](../apps/web/src/auth/redirect.ts)で認証成功後と同じ移動先を選ぶ。ログイン済みの登録は常にGoal一覧、ログインは戻り先を維持する。[実Router/SDK/AuthPage回帰](../apps/web/tests/auth-targets.browser.tsx)は未ログイン・確認待ち・ログイン済み、9種類の戻り先、replace履歴・繰返し・画面切替、登録/ログイン成功後を検査する。入口は[既存Chrome runner](../apps/web/tests/session-cache.browser-check.mjs)。合成transportの2認証POSTと、実Cookie/API/DBでの所有者404確認（対応PRの記録）を区別する。API認可や再設定の停止方針は変更しない。
+
 ### R-11の既存Issueへの対応
 
 2026-10-07の[依頼者承認範囲](product-spec.md#r-11の保存予測接続方針2026-10-07)に基づくBE追加は[#133](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/133)（親#89、Kaito）が追跡する。#76/#77はmain反映済みで、以下の2026-10-05の分担表・Supporting候補の履歴とは分ける。#117とFE #78/#81の画面はこのBE変更へ混ぜない。

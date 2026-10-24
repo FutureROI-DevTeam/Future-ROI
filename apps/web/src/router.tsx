@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
-import { authSearch } from './auth/redirect.ts';
+import { afterAuthTarget, authSearch } from './auth/redirect.ts';
+import type { AuthMode } from './auth/form.ts';
 import { resetSearch } from './auth/reset.ts';
 import { checkSession, SessionUnreachableError } from './auth/session.ts';
 import { AppShell } from './routes/AppShell.tsx';
@@ -19,7 +20,7 @@ import { EvaluationPage } from './features/evaluation/EvaluationPage.tsx';
  * ルートの構成（#146）。
  *
  *   /                          公開トップ（ログイン不要）
- *   [auth]                     ログイン・新規登録。ログイン済みなら戻り先へ移る
+ *   [auth]                     ログイン・新規登録。ログイン済みの登録はGoal一覧、ログインは戻り先へ移る
  *     /login, /register
  *   /forgot-password           再設定メールの要求（ログイン中でも無効リンクから再要求できる）
  *   /reset-password            メールのリンクから戻り、新しいパスワードを保存（?token= か ?error=INVALID_TOKEN）。
@@ -49,19 +50,20 @@ const authLayout = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
   validateSearch: authSearch,
-  // ログイン済みなら、ログイン画面を出さずに戻り先へ移る（履歴を置き換え、「戻る」でこの画面へ戻らない）。
-  // 確認できなかった（通信の失敗）ときは、そのままログイン画面を出す
-  beforeLoad: async ({ search }) => {
-    if ((await checkSession()).kind === 'signed-in') {
-      throw redirect({ href: search.redirect, replace: true });
-    }
-  },
   component: Outlet,
 });
+
+// 確認できないときはフォームを出す。確認済みなら成功後と同じ方針で移り、戻る履歴を残さない（P-16）。
+async function redirectSignedIn(mode: AuthMode, target: string) {
+  if ((await checkSession()).kind === 'signed-in') {
+    throw redirect({ href: afterAuthTarget(mode, target), replace: true });
+  }
+}
 
 const loginRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/login',
+  beforeLoad: ({ search }) => redirectSignedIn('login', search.redirect),
   component: function LoginRoute() {
     const { redirect: redirectTo, reason } = loginRoute.useSearch();
     return <AuthPage mode="login" redirectTo={redirectTo} reason={reason} />;
@@ -71,6 +73,7 @@ const loginRoute = createRoute({
 const registerRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/register',
+  beforeLoad: ({ search }) => redirectSignedIn('register', search.redirect),
   component: function RegisterRoute() {
     const { redirect: redirectTo, reason } = registerRoute.useSearch();
     return <AuthPage mode="register" redirectTo={redirectTo} reason={reason} />;
@@ -84,8 +87,8 @@ const forgotPasswordRoute = createRoute({
   component: ForgotPasswordPage,
 });
 
-// 復旧用の画面なので[auth]（ログイン済みなら戻り先へ移す）の外に置く。中に置くと、ログイン中のブラウザで
-// 有効なメールのリンクを開いてもGoal一覧へ移され、フォームに到達できない。
+// 復旧用の画面にはlogin/registerの転送guardを付けない。ログイン中に旧メールリンクを開いた場合も、
+// 再設定の画面（停止中は案内）へ到達できるようにする。
 const resetPasswordRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/reset-password',
