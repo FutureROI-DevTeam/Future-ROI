@@ -59,6 +59,20 @@ async function run() {
   ensure(path() === '/', 'back after the login redirect returned to the login page: ' + path());
   results.push('signed-in: /login redirects to the return target with replace (back skips login)');
 
+  // #264: URLのqueryを通した戻り先も、routerのbeforeLoad前にアプリ内の既定先へ戻す。
+  for (const target of ['/\\example.test', '/\\']) {
+    transport.owner = null;
+    await go('/login?redirect=' + encodeURIComponent(target));
+    ensure(path() === '/login', '#264: signed-out user did not stay on login');
+    ensure((router.state.matches.at(-1)?.search as { redirect?: string }).redirect === '/goals', '#264: validated return target was kept');
+    transport.owner = 'A';
+    await go('/');
+    await go('/login?redirect=' + encodeURIComponent(target));
+    ensure(path() === '/goals', '#264: signed-in invalid return target reached ' + path());
+    ensure(!text().includes(c.error.title), '#264: invalid return target showed the error screen');
+  }
+  results.push('#264: slash-backslash return targets fall back to the Goal list before and after session confirmation');
+
   // 直URL・旧メールリンクはログインの有無に関係なく案内だけを出し、入力も送信もできない。
   for (const owner of ['A', null]) {
     transport.owner = owner;

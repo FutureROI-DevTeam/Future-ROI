@@ -3,9 +3,12 @@ export type AuthReason = 'expired';
 
 export type AuthSearch = { redirect: string; reason?: AuthReason };
 
-/** アプリ内の戻り先か（外部URL・`//host` を戻り先にしない）。 */
+/** アプリ内の戻り先か（外部URL・`//host`・先頭のスラッシュ＋バックスラッシュを除く）。 */
 function isAppPath(value: unknown): value is string {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//');
+  return typeof value === 'string'
+    && value.startsWith('/')
+    && !value.startsWith('//')
+    && !value.startsWith('/\\');
 }
 
 /**
