@@ -104,6 +104,8 @@ FEの「整合snapshot」は別GET間の日付・設定・回答版・累計・�
 
 FE結合は[#137](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/137)が追跡する（#133のBEが前提）。
 
+[#117](https://github.com/FutureROI-DevTeam/Future-ROI/issues/117)の共通固定例は[横断回帰](../scripts/tests/r11-fixed-examples.test.mjs)で、既存18例の数値・出所・不足/達成済み/今日記録済みの状態を、現行Engine → BEのToday変換 → 厳密HTTP serializer → FE表示変換の順に照合する。両単位の実績・条件付き回数も確認し、`npm test`に含める。単独ではPrediction build後に`npm run verify:r11`。旧FEの13固定例はD-31以前のsampling値なので、明示`sampled`で再現し、現在の既定`auto`は別にEngine/BE/FE間の一致を確認する。旧固定値や許容誤差・計算方式は変更しない。旧提案の保存/UI例の再採択、実DB/認証route・実ブラウザ・人間の理解・精度の受入とは区別する。
+
 | #137の変更 | 実装 | 確認 |
 | --- | --- | --- |
 | Goalの作成・編集で初期質問に答える（2問とも選ぶまで保存しない、#259・P-24）・撤回する、回答版の競合（409）を読み込み直す | [goals-http.ts](../apps/web/src/api/goals-http.ts)（`?view=r11`）、[goal-form.ts](../apps/web/src/features/goals/goal-form.ts)（送る本文と回答版の規則）、[GoalFormPage](../apps/web/src/features/goals/GoalFormPage.tsx)、[QuestionPriorFields](../apps/web/src/features/prior/QuestionPriorFields.tsx) | [goal-form.test.mjs](../apps/web/tests/goal-form.test.mjs)（回答・撤回・回答版の付け方、必須の選択（#259）、422の項目対応、409後の通信中断・503で旧cacheを採用せず取得成功後に最新の版を使う回帰）、合成DBの実ブラウザで409→GET503／中断→入力・競合保持→再取得成功→再保存を確認する |
