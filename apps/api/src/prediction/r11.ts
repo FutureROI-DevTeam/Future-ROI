@@ -2,7 +2,7 @@ import type { TodayR11 } from '../contracts/r11.ts';
 import { localDateIn, shiftLocalDate } from '../goals/local-date.ts';
 import { validateSavedQuestion } from '../questions/snapshot.ts';
 import { runQuestionPrediction } from './engine.ts';
-import type { TodaySnapshot } from './store.ts';
+import type { TodaySnapshot } from './snapshot.ts';
 
 // 呼出元はsnapshot取得とDB接続返却を完了してから呼ぶ。回答は保存mappingで全実ログへ接続する。
 export function buildR11Today(snapshot: TodaySnapshot): TodayR11 {
