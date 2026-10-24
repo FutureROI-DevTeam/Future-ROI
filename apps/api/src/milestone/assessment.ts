@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { DEFAULT_CONFIG, completionDistributionForFrozenState, frozenCompletionCdf } from '@futureroi/prediction';
-import type { TodaySnapshot } from '../prediction/store.ts';
+import type { TodaySnapshot } from '../prediction/snapshot.ts';
 import { makeEvaluation, prefixFingerprint } from '../evaluation/assessment.ts';
 import { localDateIn, shiftLocalDate } from '../goals/local-date.ts';
 import {
