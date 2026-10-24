@@ -388,7 +388,7 @@ body:has(.fr-page--today) { background: #eef3f5; }
   border-radius: 12px;
   background: var(--fr-bg);
   color: var(--fr-ink);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
