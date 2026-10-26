@@ -113,6 +113,10 @@ test('#244: real form/Today at 320/390/768/1440, native input, confirmed feedbac
     await resize(width);
     for (const mode of ['list', 'create', 'edit', 'today']) {
       await mount(mode);
+      if (mode === 'list') {
+        const dateFonts = await evaluate('[...document.querySelectorAll(".fr-footprint__day > span:last-child")].map(e=>parseFloat(getComputedStyle(e).fontSize))');
+        assert.ok(dateFonts.length > 0 && dateFonts.every(size => size >= 14 && size <= 16), 'footprint dates must meet the 14–16px requirement at ' + width);
+      }
       await evaluate('document.fonts.ready');
       const layout = await evaluate(`(()=>{
         const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0;
@@ -162,6 +166,8 @@ test('#244: real form/Today at 320/390/768/1440, native input, confirmed feedbac
     assert.equal(previewLayout.compactVisible, width < 960);
     assert.equal(previewLayout.announcers, 1);
     assert.equal(previewLayout.focus, true);
+    const previewFonts = await evaluate('[...document.querySelectorAll(".fr-draft-preview p")].map(e=>parseFloat(getComputedStyle(e).fontSize))');
+    assert.ok(previewFonts.length > 0 && previewFonts.every(size => size >= 14 && size <= 16), 'draft preview must meet the 14–16px requirement at ' + width);
     if (width >= 960) {
       const box = await evaluate('document.querySelector(".fr-draft-preview").getBoundingClientRect().toJSON()');
       assert.ok(box.y >= 0 && box.bottom <= 1000, 'PC input focus hid the right preview');
