@@ -5,7 +5,7 @@ import { localDateIn, shiftLocalDate } from '../goals/local-date.ts';
 import type { TodayR11 } from '../contracts/r11.ts';
 import { runQuestionPredictionWithDiagnostics } from '../prediction/engine.ts';
 import { validateSavedQuestion } from '../questions/snapshot.ts';
-import type { TodaySnapshot } from '../prediction/store.ts';
+import type { TodaySnapshot } from '../prediction/snapshot.ts';
 
 export type SavedEvaluation = Omit<EvaluationForecast, 'id' | 'issuedAt' | 'expiresAt' | 'p50State' | 'p80State'> & {
   schemaVersion: 'evaluation-v1';

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { TodaySnapshot } from '../src/prediction/store.ts';
+import type { TodaySnapshot } from '../src/prediction/snapshot.ts';
 import { assessEpisode, contextKey, episodeView, makeEpisode, type EpisodeRow } from '../src/milestone/assessment.ts';
 import { DEFAULT_CONFIG, completionDistributionForFrozenState } from '@futureroi/prediction';
 import { MILESTONE_PROTOCOL, applyOffset, identityFit, observationLoss } from '../src/milestone/core.ts';
