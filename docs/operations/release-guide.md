@@ -1,5 +1,9 @@
 # Future ROI リリース手順書（初めて担当する人向け）
 
+**現行のパスワード再設定は停止中です（2026-10-24、main `2eef996` のコード確認）。** [停止方針](../../apps/api/src/auth/password-reset-policy.ts)は`PASSWORD_RESET_ENABLED=false`で、[メール設定](../../apps/api/src/config.ts)は環境変数を読む前に`disabled`を返します。停止版の起動に`RESEND_API_KEY`・`MAIL_FROM`は不要で、`MAIL_TRANSPORT=log`を残したり変更したりしても再設定は再開しません。[送信処理](../../apps/api/src/auth/mail-transport.ts)もlog/resendの送信関数を作りません。以下の「#258版」のメール準備・配送確認は、[Architectureの再開条件](../architecture.md#パスワード再設定256)と[#295](https://github.com/FutureROI-DevTeam/Future-ROI/issues/295)配下の別作業で再開が承認された版にだけ適用します。
+
+冒頭の2026-10-12のPR状態と12-Bの2026-10-13のメール例外は当時の記録です。この追補は文書とコードの照合であり、本番の稼働SHA・環境変数・過去ログ・配送を確認した記録ではありません。既発行トークンや過去ログの削除・失効も完了扱いにしません。文書不具合は[#310](https://github.com/FutureROI-DevTeam/Future-ROI/issues/310)、現行仕様は[Architecture](../architecture.md#パスワード再設定256)を参照します。
+
 > Supporting Artifact / Not a Source of Truth。文書作業は [#268](https://github.com/FutureROI-DevTeam/Future-ROI/issues/268)、関連する公開受入は [#83](https://github.com/FutureROI-DevTeam/Future-ROI/issues/83)。製品仕様は [Product Spec](../product-spec.md)、採択と条件は [Architecture](../architecture.md#deployment)、公開受入の正本は [release-demo.md](release-demo.md)。この文書は、既存の条件を実施順に説明する補助ガイドです。
 
 **いまは文書準備の段階です。工程0〜2の確認を行い、工程3以降のクラウド作成・設定・実DB操作・配備は、対象と差分が承認されるまで実行しないでください。** 本書の作成では実デプロイ、アカウント作成、Secret入力、実DBのmigration／backup／復元を行っていません。公式資料を確認した日：2026-10-12 UTC。管理画面の操作は公式資料に基づく未実施の手順で、画面名や利用条件が変わったらそこで止めて確認します。
@@ -180,6 +184,8 @@ NeonのConnectで対象branch・database・roleを選び、Pooled connectionのO
 
 ### #258を含む版のメール準備
 
+**適用条件：再設定の再開が承認された版だけ。** 現行停止版ではこのメール準備を起動条件にせず、メールサービス・Secret・DNSを本書だけを根拠に追加しません。配送準備は[#300](https://github.com/FutureROI-DevTeam/Future-ROI/issues/300)、停止解除は[#302](https://github.com/FutureROI-DevTeam/Future-ROI/issues/302)の受入・承認を別に追います。
+
 **操作場所：** Resend Dashboard → Domains／API Keys、所有ドメインのDNS管理画面、Vercelの対象環境。**担当：** メール／DNS担当＋運用担当。実施はPR統合後の承認済みSHAだけで行います。
 
 1. Domains → Add Domainで所有するドメイン／サブドメインを登録します。書式例 `account.example.com`。Resendに表示されたSPF／DKIM等のDNSレコードを、その画面の値どおりにDNS担当が設定します。既存MXを上書きせず、表示された用途を確認します。[認証ドメイン](https://resend.com/docs/dashboard/domains/introduction)
@@ -190,7 +196,7 @@ NeonのConnectで対象branch・database・roleを選び、Pooled connectionのO
 
 `MAIL_TRANSPORT=log`は**隔離ローカル確認専用**で、公開／共有Preview／staging／本番では使用しません。#258ではproductionでも`log`を選べてしまうため、起動が拒否してくれると期待しないでください。本文に再設定トークンを含むURLを出力します。URLは本人確認の資格情報として扱い、ログ・スクリーンショットを共有しません。Resendのtracking・本文保存・閲覧権限も再設定リンクの取扱いとして確認します。
 
-**この設定工程の成功：** 対象環境の変数名と設定条件を2人で照合し、実値を含めない記録を残す。#258版はキー・送信元・Verifiedの準備まで確認する。**設定時の停止条件：** URL／DB／Secretの環境取り違え、公開HTTP例外、`log`、未認証ドメイン、未マージPRを含む配備。実配送は配備後の工程8-Cで行い、配送未確認は**一般公開への停止条件**です。設定済みでも配信済みとは扱いません。
+**この設定工程の成功：** 対象環境の変数名と設定条件を2人で照合し、実値を含めない記録を残す。再開が承認された#258版だけキー・送信元・Verifiedの準備まで確認する。停止版ではメール資格情報や配送の未準備だけをアプリ全体の起動停止条件にしない。**設定時の停止条件：** URL／DB／Secretの環境取り違え、公開HTTP例外、再開版での`log`／未認証ドメイン、未マージPRを含む配備。再開版の実配送は配備後の工程8-Cで行い、配送未確認は**再設定の一般公開への停止条件**です。設定済みでも配信済みとは扱いません。
 
 ### 既定OFFの2機能を有効化したい場合
 
@@ -335,13 +341,15 @@ Seedの成功はexit 0・専用2Goal／60履歴と当日の基準日、その後
 | Origin／CSRF | Networkで正規保存が同一originであることを確認。API担当が合成fixtureで認証済み変更要求へ別origin（例 `https://other.example.invalid`）／Origin欠落／same-site別originを与える | 正規保存は成功、業務APIの不正Originは403 `ORIGIN_REJECTED`。認証endpointのOrigin拒否も確認。許可originを増やして回避しない |
 | 全Set-Cookie・cache | 登録／ログイン／セッション更新／logoutのNetworkで、複数Set-Cookieを含むfixtureを実経路に通し全件転送をAPI担当が確認 | 個数・属性がfixtureの期待値と一致。private APIは成功・失敗ともno-store、ログアウト後に他人のcacheが出ない。未試験なら停止 |
 | proxy・回数制限 | API担当が実hop・header形式・実client IPを機密を出さないfixtureで記録し`TRUST_PROXY_HOPS`を決める。別接続元と偽造X-Forwarded-For／内部IP header、複数instance・再起動を確認。QA3人で会場共有回線を確認 | 偽装で上限回避できず、正当利用を不必要に巻き込まない。既定は60秒6回目等で429、整数の待ち時間と経過後成功。実fixture・測定手段は未整備なら担当が準備して停止を解除する。hop推測で合格にしない |
-| トークンとSecretのログ除外 | API担当が配備対象SHAの通常infoログ・例外ログの秘匿と合成回帰の成功証拠を照合。合成文字列`release-qa-token`を `/api/auth/reset-password/release-qa-token` と `/reset-password?token=release-qa-token` で使い、ログを内部検索。POST `/api/auth/reset-password?token=release-qa-token` も確認。Vercelのruntime／requestログ・analytics等の保存先も確認 | **各URLのtokenがログに残らない**。password・Cookie・Authorization・DB URL・再設定本文も残らない。最新#258は [req serializer](https://github.com/FutureROI-DevTeam/Future-ROI/blob/e492e55fef072d9fe317c3b6d6f869616813ebf5/apps/api/src/app.ts) で [redactLogUrl](https://github.com/FutureROI-DevTeam/Future-ROI/blob/e492e55fef072d9fe317c3b6d6f869616813ebf5/apps/api/src/http/log-url.ts) を呼び、パス／queryのtokenを除く実装と [合成ログ回帰](https://github.com/FutureROI-DevTeam/Future-ROI/blob/e492e55fef072d9fe317c3b6d6f869616813ebf5/apps/api/tests/password-reset.test.ts) がある（今回の確認は静的読取りのみ）。mainにはまだ反映されていない。対象SHAでの回帰とhosting側ログ確認が揃うまで#258版公開停止。[Fastify Logging](https://fastify.dev/docs/latest/Reference/Logging/) |
+| トークンとSecretのログ除外 | API担当が配備対象SHAの通常infoログ・例外ログの秘匿と合成回帰の成功証拠を照合。合成文字列`release-qa-token`を `/api/auth/reset-password/release-qa-token` と `/reset-password?token=release-qa-token` で使い、ログを内部検索。POST `/api/auth/reset-password?token=release-qa-token` も確認。Vercelのruntime／requestログ・analytics等の保存先も確認 | **各URLのtokenがログに残らない**。password・Cookie・Authorization・DB URL・再設定本文も残らない。最新#258は [req serializer](https://github.com/FutureROI-DevTeam/Future-ROI/blob/e492e55fef072d9fe317c3b6d6f869616813ebf5/apps/api/src/app.ts) で [redactLogUrl](https://github.com/FutureROI-DevTeam/Future-ROI/blob/e492e55fef072d9fe317c3b6d6f869616813ebf5/apps/api/src/http/log-url.ts) を呼び、パス／queryのtokenを除く実装と [合成ログ回帰](https://github.com/FutureROI-DevTeam/Future-ROI/blob/e492e55fef072d9fe317c3b6d6f869616813ebf5/apps/api/tests/password-reset.test.ts) がある（今回の確認は静的読取りのみ）。これは#258候補HEADの確認記録。現行mainにはログ除外実装と#285の停止方針がある。停止中も対象SHAの回帰とhosting側ログ確認を別に行い、過去ログが消えたとは扱わない。再開版はそのSHAで秘匿・配送を確認するまで公開停止。[Fastify Logging](https://fastify.dev/docs/latest/Reference/Logging/) |
 
 現在のコードにこれらの実公開試験用入口がそろっているとは確認していません。API担当が合成fixture・測定経路・中止方法を #83 で準備し、結果がない行は未確認のまま止めます。実ユーザーのtokenを使って漏えいを再現しません。既存header redactや`LOG_LEVEL`の変更だけでログ安全性を合格にしません。
 
 初回担当からの依頼例：「このSHAと実URLについて、8-B・8-Dの試験手順と結果を #83 へ記録してください。未整備なら一般公開を止め、通常の画面QAから先に進めます。」
 
 ### 8-C. #258版の再設定メール
+
+**現行停止版では再設定の要求・保存は503 `RESET_PASSWORD_DISABLED`、画面は停止案内が期待値です。** メール配送と再設定成功を要求する下記の手順は、停止解除が承認された版だけに適用します。停止版の503を配送障害と取り違えず、Secret設定や`MAIL_TRANSPORT`の変更で解除しません。公開先に停止版が反映されたかの確認は、対象SHAを特定して別途行います。
 
 **前提：** レビュー・統合後のSHA、工程4のVerified、8-Bのトークン除外が完了している。
 
@@ -427,7 +435,8 @@ DBを変えない更新でもschemaの読取り確認と復旧記録を確認し
 | health 503／保存失敗 | 4の接続先・TLS、6の読取り、8-Dの枠・休止・poolを確認 | DB全消去、無制限retry、有料upgrade |
 | checksum不一致／0002拒否 | 6で停止しAPI／DB担当へ。適用済み履歴を保全 | 既存SQL書換え、履歴削除、Goal削除で通す |
 | ログインloop／Cookie欠落 | 4の実origin、8-Bの全Set-Cookie・HTTPS・proxyを確認 | 別origin/CORSへの無断変更、trusted originの一括許可 |
-| メール未着／要求200 | 4のVerified／送信元／キー、8-CのResend結果・quota・受信箱を確認 | 200を配信成功にする、公開でlogへ切替える |
+| 再設定要求が503 `RESET_PASSWORD_DISABLED` | 現行停止版の期待値。対象SHAと画面の停止案内を確認。公開先への停止版反映は別確認 | メール設定だけでの再開、未承認の停止解除 |
+| メール未着／要求200（再開版） | 4のVerified／送信元／キー、8-CのResend結果・quota・受信箱を確認 | 200を配信成功にする、公開でlogへ切替える |
 | token／Secret漏えい | 11-Aで受付停止、担当者が失効・rotationとログ取扱いを判断 | 実tokenをIssueへ貼る、隠しただけで再開 |
 
 ## 12. 自動配備（CD）
@@ -464,10 +473,12 @@ Application／FoundationのmainでのCI完了を起床イベントとして、`w
 | 2 | Project `future-roi` → Settings → Deployment Protection → Protection Bypass for Automation で値を発行する（Hobbyで使えない場合は止めて相談） | Vercelの所有者 |
 | 3 | GitHub → Settings → Environments に `production`（Deployment branchesをmainだけ）と `production-migration`（同じ制限＋Required reviewers）を作る。両方にSecret `VERCEL_TOKEN`、`production` に `VERCEL_AUTOMATION_BYPASS_SECRET` を登録 | repo admin |
 | 4 | Repository variables に `VERCEL_ORG_ID`・`VERCEL_PROJECT_ID`・`PRODUCTION_URL`（`https://future-roi.vercel.app`）・`CD_ENABLED`（最初は `false`）を登録 | repo admin |
-| 5 | **mainが#258を含むため**、`RESEND_API_KEY` と `MAIL_FROM` をVercel Productionへ登録する（工程4のメール準備）。未設定だと起動時に失敗するが、12-Aの5で止まり本番URLは切り替わらない。2026-10-13の一時例外は下記 | メール担当 |
+| 5 | **現行の再設定停止版ではメール資格情報の登録は不要。** `RESEND_API_KEY`・`MAIL_FROM`の未設定でメール設定が起動を拒否することはない（他の必須設定・DB・schemaの確認は必要）。再開が承認された版では、工程4と#300・#302に従い配送準備・受入と停止解除を別に確認する。下記のlog例外は過去の記録で、現在の設定指示ではない | メール担当＋API担当 |
 | 6 | `CD_ENABLED` を `true` にし、Actions → Application の最新main実行を Re-run するか次のマージを待つ。Deploy productionのSummaryで候補・本番SHA・health結果を確認する | 運用担当 |
 
-**2026-10-13の一時例外（`MAIL_TRANSPORT=log`）：** 送信用ドメインがなく、公開は同日8:00（JST）までの利用に限るため、配備担当の判断でVercel Productionに `MAIL_TRANSPORT=log` を設定した。工程4の「公開でlogを使わない」に対する、期限付きの例外である。
+**2026-10-13の一時例外（`MAIL_TRANSPORT=log`、以下は当時の記録）：** 送信用ドメインがなく、公開は同日8:00（JST）までの利用に限るため、配備担当の判断でVercel Productionに `MAIL_TRANSPORT=log` を設定した。工程4の「公開でlogを使わない」に対する、期限付きの例外である。
+
+**現行との区別：** [#284](https://github.com/FutureROI-DevTeam/Future-ROI/issues/284)・[PR #285](https://github.com/FutureROI-DevTeam/Future-ROI/pull/285)の停止版では、メール設定を読まず、再設定APIを拒否し、log送信も行いません。次の影響・終了判断は停止前の例外に関する履歴として保持します。停止版が全instanceへ反映済みか、過去ログや既発行トークンが残るかはこの文書修正では未確認です。`CD_ENABLED`や本番環境変数を変更したり、例外を再承認したりする手順ではありません。
 
 - 影響：パスワード再設定のメールは届かない（画面は送信済みと表示する）。宛先と再設定リンクがVercelのruntimeログに出る。ログはProjectの所有者だけが読め、Hobbyでは1時間保持される。
 - 他の案：ドメインを購入してResendを使う案は費用0円の方針に反し、当日中に承認を得られない。無料サブドメイン（is-a.dev等）は、Resendの所有要件を満たすか未確認で、承認待ちの時間もかかる。CDを止めて手動配備を続ける案は、CDを有効化する目的に合わない。
