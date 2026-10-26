@@ -15,6 +15,13 @@ test('外部URLや戻り先の型違反は認証後の転送先にせずGoal一�
   }
 });
 
+test('#264: スラッシュとバックスラッシュで始まる戻り先はGoal一覧へ戻す', () => {
+  for (const redirect of ['/\\example.test', '/\\', '/\\\\example.test']) {
+    assert.deepEqual(authSearch({ redirect }), { redirect: '/goals' });
+    assert.deepEqual(authSearch({ redirect, reason: 'expired' }), { redirect: '/goals', reason: 'expired' });
+  }
+});
+
 test('ログイン切れで来たときの理由（expired）だけを残し、知らない値は捨てる', () => {
   assert.deepEqual(authSearch({ redirect: '/goals/x', reason: 'expired' }), { redirect: '/goals/x', reason: 'expired' });
   assert.deepEqual(authSearch({ reason: 'other' }), { redirect: '/goals' });

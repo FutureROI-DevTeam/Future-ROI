@@ -156,7 +156,7 @@ test('#191 Today boundaries: response ordering, cancelled retry, and batched dra
 
 test('#146 routes: signed-out/signed-in/reset pause/unreachable/404/error move and render correctly with the real router, with one <main> (#237)', { timeout: 180000 }, async (t) => {
   const result = await runBrowser(t, './routes.browser.tsx', false, true);
-  assert.equal(result.results.length, 9);
+  assert.equal(result.results.length, 10);
   assert.equal(result.writes, 0);
   t.diagnostic(JSON.stringify(result));
 });
