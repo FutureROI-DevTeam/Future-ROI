@@ -104,9 +104,9 @@ FEの「整合snapshot」は別GET間の日付・設定・回答版・累計・�
 | #133の変更 | 実装 | 確認 |
 | --- | --- | --- |
 | raw回答・保存snapshot・回答版・文脈変更での撤回 | [0003](../apps/api/migrations/0003_goal_question_prior.sql)、[snapshot.ts](../apps/api/src/questions/snapshot.ts)、[Goal store](../apps/api/src/goals/store.ts)、[入力schema](../apps/api/src/contracts/question.ts) | [保存・同時更新・失敗回帰](../apps/api/tests/question-prior.test.ts)、[非破壊migration](../apps/api/tests/migrate.test.ts) |
-| 保存回答＋同じToday snapshotの実ログから予測と出所を作る | [公開Engine](../packages/prediction/src/question-prior.ts)、[Today変換](../apps/api/src/prediction/r11.ts)、[専用DTO/query](../apps/api/src/contracts/r11.ts)、[Goal GET](../apps/api/src/goals/routes.ts)・[Today GET](../apps/api/src/prediction/routes.ts)、[D-26](architecture.md#2026-10-07の保存予測接続133)。両GETの`?view=r11`を依頼者承認範囲で接続 | [公開Engine回帰](../packages/prediction/tests/question-prior-public.test.mjs)、[HTTP旧互換・owner/認証・query・部分回答/UNKNOWN/撤回/競合・出所・日跨ぎsnapshot](../apps/api/tests/question-prior-http.test.ts)、型の双方向検査と通常snapshot更新回帰。FE結合・E2E・チームレビューは別に確認 |
+| 保存回答＋同じToday snapshotの実ログから予測と出所を作る | [公開Engine](../packages/prediction/src/question-prior.ts)、[Today変換](../apps/api/src/prediction/r11.ts)、[専用DTO/query](../apps/api/src/contracts/r11.ts)、[Goal GET](../apps/api/src/goals/routes.ts)・[Today GET](../apps/api/src/prediction/routes.ts)、[D-26](architecture.md#2026-10-07の保存予測接続133)。両GETの`?view=r11`を依頼者承認範囲で接続 | [公開Engine回帰](../packages/prediction/tests/question-prior-public.test.mjs)、[HTTP旧互換・owner/認証・query・部分回答/UNKNOWN/撤回/競合・出所・日跨ぎsnapshot](../apps/api/tests/question-prior-http.test.ts)、型の双方向検査と通常snapshot更新回帰。#133単体ではFE結合・E2E・チームレビューは別に確認 |
 
-FE結合は[#137](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/137)が追跡する（#133のBEが前提）。
+FE結合は[#137](https://github.com/FutureROI-DevTeam/Future-ROI/issues/137)・[PR #139](https://github.com/FutureROI-DevTeam/Future-ROI/pull/139)でmainへ統合済み（#133のBEが前提）。実利用者の理解確認は[#261](https://github.com/FutureROI-DevTeam/Future-ROI/issues/261)で追跡する。
 
 [#117](https://github.com/FutureROI-DevTeam/Future-ROI/issues/117)の共通固定例は[横断回帰](../scripts/tests/r11-fixed-examples.test.mjs)で、既存18例の数値・出所・不足/達成済み/今日記録済みの状態を、現行Engine → BEのToday変換 → 厳密HTTP serializer → FE表示変換の順に照合する。両単位の実績・条件付き回数も確認し、`npm test`に含める。単独ではPrediction build後に`npm run verify:r11`。旧FEの13固定例はD-31以前のsampling値なので、明示`sampled`で再現し、現在の既定`auto`は別にEngine/BE/FE間の一致を確認する。旧固定値や許容誤差・計算方式は変更しない。旧提案の保存/UI例の再採択、実DB/認証route・実ブラウザ・人間の理解・精度の受入とは区別する。
 
@@ -204,6 +204,8 @@ DB migrationのCI一覧（[#174](https://github.com/jogi-hack-2026-team/jogi-hac
 #71〜#73の限定先行承認に沿った純粋Engineとテストを追加した。型・入口は[src](../packages/prediction/src/index.ts)、固定例は[fixtures.ts](../packages/prediction/tests/fixtures.ts)、補完・訂正の実行例は[再計算例](../packages/prediction/README.md#補完訂正後の再計算例)。[検証手順・残条件](../packages/prediction/README.md#70後に合わせる点と残条件)を確認する。predictは必須metadataを持つPredictionResultを返し、依頼者承認済みの日数集計と公開例外の[契約](../packages/prediction/README.md#metadata公開エラーの契約)を反映した。#77でToday APIへ結合し、root workspaceとDockerにビルド済みEngineを含める。純粋Engineの型検査・数値テストCIとApplication CIで検証する。業務画面・公開配置・製品としての正式受入は未完了。
 
 ## R-11追加UIの独立候補
+
+以下は2026-10-05〜06の候補検証記録。現在のFE結合は上記[#137](https://github.com/FutureROI-DevTeam/Future-ROI/issues/137)、共通固定例は[横断回帰](../scripts/tests/r11-fixed-examples.test.mjs)を参照する。
 
 [#117](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/117)の[質問・出所表示部品と受け渡し案](../experiments/question-prior-ui-candidate/README.md)はSupporting Artifact。Scope・分担の採択記録はPR115、具体契約提案はPR118、計算adapter候補はPR119で別に追跡する。正式Goal/Today、API/Engine結合は未確認で、#70 Hard・D-26未採択・既存Ready/blockedを変更しない。[src](../experiments/question-prior-ui-candidate/src/presentation-types.ts)・[最小slot例](../experiments/question-prior-ui-candidate/examples/slots.tsx)・[型/SSR/preview buildの再現](../experiments/question-prior-ui-candidate/scripts/check.mjs)・[検証記録](../experiments/question-prior-ui-candidate/VERIFICATION.md)から調査できる。root依存・workspaceは追加していない。
 
