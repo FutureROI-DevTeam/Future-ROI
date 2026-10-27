@@ -797,7 +797,7 @@ Consequences / Invariants: marker用の最小tableと複合unique制約を追加
 
 #### 2026-10-07の保存・予測接続（#133）
 
-[Productの承認範囲](product-spec.md#r-11の保存予測接続方針2026-10-07)と[Issue #133](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/133)を根拠に実装する。2026-10-07 03:12 UTC「仕上げていいよ」、03:26 UTC「続けて」により、Goal/Today GETの`?view=r11`専用DTO選択と公開route・HTTP回帰の仕上げも依頼者が承認した。以下の具体契約はチームレビュー対象で、Human Approve・Merge・FE結合・製品受入とは扱わない。
+[Productの承認範囲](product-spec.md#r-11の保存予測接続方針2026-10-07)と[Issue #133](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/133)を根拠に実装する。2026-10-07 03:12 UTC「仕上げていいよ」、03:26 UTC「続けて」により、Goal/Today GETの`?view=r11`専用DTO選択と公開route・HTTP回帰の仕上げも依頼者が承認した。以下の具体契約は2026-10-07時点の依頼者承認・チームレビュー対象であり、当時はHuman Approve・Merge・FE結合・製品受入を意味しなかった。保存・予測接続は[PR #136](https://github.com/FutureROI-DevTeam/Future-ROI/pull/136)、FE結合は[PR #139](https://github.com/FutureROI-DevTeam/Future-ROI/pull/139)でmainへ統合済み。実利用者による理解・予測精度・公開環境の受入とは区別する。
 
 | 境界 | 契約と理由 |
 | --- | --- |
