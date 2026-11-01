@@ -222,7 +222,7 @@ export async function createGoal(pool: Pool, userId: string, input: GoalCreate, 
   throw new Error('Fresh create key did not create a goal');
 }
 
-export type LockedField = 'timezone' | 'initialProgress';
+export type LockedField = 'timezone';
 export type UpdateResult =
   | { kind: 'updated'; goal: GoalRead }
   | { kind: 'not_found' }
@@ -231,7 +231,7 @@ export type UpdateResult =
   | { kind: 'answer_conflict' }
   | { kind: 'invalid_question_patch'; field: 'questionPrior' | 'expectedAnswerRevision' };
 
-// 記録が1件でもあるGoalでは timezone と initialProgress を変更できない（R-02）。
+// 記録後のtimezoneは固定する。開始前の累計は設定版CASの下で訂正可能（#319、P-26）。
 // 同じ値の再送は「変更」ではないので通す。行をロックして、同時の記録追加と判定がずれないようにする。
 export async function updateGoal(
   pool: Pool,
@@ -316,9 +316,6 @@ export async function updateGoal(
       const locked: LockedField[] = [];
       if (patch.timezone !== undefined && patch.timezone !== current.timezone) {
         locked.push('timezone');
-      }
-      if (patch.initialProgress !== undefined && patch.initialProgress !== current.initial_progress) {
-        locked.push('initialProgress');
       }
       if (locked.length) {
         await client.query('rollback');

@@ -124,7 +124,7 @@ export async function registerGoalRoutes(app: FastifyInstance, deps: GoalRouteDe
           return reply.code(422).send(
             errorBody(
               'GOAL_HAS_LOGS',
-              'timezone and initialProgress cannot be changed once the goal has logs.',
+              'timezone cannot be changed once the goal has record history.',
               result.fields.map((field) => ({ path: `body/${field}`, message: 'cannot be changed once the goal has logs' })),
             ),
           );

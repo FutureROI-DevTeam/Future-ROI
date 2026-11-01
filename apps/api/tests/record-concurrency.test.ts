@@ -196,7 +196,7 @@ test('First PUT and Goal PATCH obey both normal lock orders without changing log
       assert.equal(stored.initialProgress, putFirst ? 0 : 10);
       assert.equal(stored.title, putFirst ? input.title : 'changed');
       assert.equal(stored.hasLogs, putFirst);
-      if (putFirst) assert.deepEqual((result.json?.error as { fields: { path: string }[] }).fields.map(f => f.path), ['body/timezone', 'body/initialProgress']);
+      if (putFirst) assert.deepEqual((result.json?.error as { fields: { path: string }[] }).fields.map(f => f.path), ['body/timezone']);
     } finally {
       pause.restore();
       await first.catch(() => {});

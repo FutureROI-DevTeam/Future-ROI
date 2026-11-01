@@ -4,7 +4,7 @@ import type { IconName } from './Icon.tsx';
 import './ConfirmDialog.css';
 
 /**
- * 取り消せない操作の確認（削除など）。ブラウザ標準の <dialog> をモーダルで開き、フォーカスの閉じ込めと Esc での取り消しを任せる。
+ * 保存内容や取り消せない操作（削除など）の確認。ブラウザ標準の <dialog> をモーダルで開き、フォーカスの閉じ込めと Esc での取り消しを任せる。
  * 開いたときは取り消し側にフォーカスを置き（うっかり確定しないため）、閉じたら開く前の場所へ戻す。
  * 実行中（busy）は閉じられないようにし、二重に押せないようにする。
  */
@@ -14,6 +14,7 @@ export function ConfirmDialog({
   children,
   confirmLabel,
   confirmIcon,
+  confirmVariant = 'danger',
   cancelLabel,
   busy = false,
   onConfirm,
@@ -24,6 +25,7 @@ export function ConfirmDialog({
   children: ReactNode;
   confirmLabel: string;
   confirmIcon?: IconName;
+  confirmVariant?: 'primary' | 'danger';
   cancelLabel: string;
   busy?: boolean;
   onConfirm: () => void;
@@ -65,7 +67,7 @@ export function ConfirmDialog({
         {children}
       </div>
       <div className="fr-dialog__actions">
-        <Button variant="danger" block busy={busy} {...(confirmIcon ? { icon: confirmIcon } : {})} onClick={onConfirm}>
+        <Button variant={confirmVariant} block busy={busy} {...(confirmIcon ? { icon: confirmIcon } : {})} onClick={onConfirm}>
           {confirmLabel}
         </Button>
         <Button ref={cancelRef} variant="secondary" block disabled={busy} onClick={onCancel}>

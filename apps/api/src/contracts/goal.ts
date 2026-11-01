@@ -31,7 +31,7 @@ export const Goal = Type.Object(
     timezone: Type.String(),
     /** 記録開始日。作成時のtimezoneの暦日で固定し、以後動かさない。 */
     recordStartDate: LocalDate,
-    /** 記録が1件でもあるか。trueならtimezoneとinitialProgressを変更できない（R-02）。 */
+    /** 記録が1件でもあるか。timezoneの編集制限に使う。開始前の累計は設定版付きで訂正できる（P-26）。 */
     hasLogs: Type.Boolean(),
     /** 過去DONEの永続marker、または現在の初期量がある場合は単位を変更できない。 */
     unitLocked: Type.Boolean(),

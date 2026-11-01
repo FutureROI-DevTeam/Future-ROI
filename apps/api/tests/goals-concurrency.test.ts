@@ -43,7 +43,7 @@ test('Goal PATCH sees a first log committed while waiting for its exclusive row 
     )).rows[0]!.n === 1);
     await writer.query(`insert into action_log (goal_id, local_date, status, amount) values ($1, '2026-10-05', 'DONE', 30)`, [goal.id]);
     await writer.query('commit');
-    assert.deepEqual(await patch, { kind: 'locked', fields: ['timezone', 'initialProgress'] });
+    assert.deepEqual(await patch, { kind: 'locked', fields: ['timezone'] });
     const stored = await getGoal(db.pool, 'owner', goal.id, () => NOW);
     assert.equal(stored?.title, input.title);
     assert.equal(stored?.timezone, input.timezone);

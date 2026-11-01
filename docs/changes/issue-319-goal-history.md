@@ -15,6 +15,8 @@ Node 24.21.0 / npm 11.19.0で実行。checkoutが要求するNode 24.22.1その�
 
 専用worktreeで次を実行する。Windowsではnpmの代わりにnpm.cmdも使える。
 
+現在のローカル確認DBを保持して再起動する場合は、API terminalで`node scripts/local-319/resume.ts`を使う。Git除外の`.local/319/preserved-runtime.json`で本人確認済みのloopback DBのみ再開し、seed・migration・DB作成・削除はしない。停止済みなら既存data directoryを再開する。開発用認証Secretは再起動で変わるため、再ログインが必要になる。設定ファイルがない別checkoutでは次の新規合成DB用手順を使う。
+
 1. Node 24をPATHへ設定し、`npm run build:prediction`、`node scripts/local-319/server.ts`を起動する（APIは127.0.0.1:4319）。
 2. 別terminalでPowerShellの`$env:API_PROXY_TARGET='http://127.0.0.1:4319'`を設定し、`npm run dev:web -- --port 5319 --strictPort`を起動する。
 3. [ローカルログイン](http://127.0.0.1:5319/login)を開き、session.jsonの合成アカウントで確認する。Goal IDは起動ごとに変わる。
@@ -120,3 +122,58 @@ review-gateによりIssue、認可、日付、量とNULL、CAS/rollback、sessio
 正式統合前の判断事項は、旧PUTでhistory版を省略するクライアントの移行・必須化、R-11追加metadataを扱えない旧タブの再読込方針、新migrationの適用と画面操作の受入である。旧クライアントが版を省略する場合、新しい履歴CASの保証はない。長期履歴ではfingerprintが全履歴に比例する通信量を持つ。
 
 Safari/iOS実機、実screen reader、実利用者による理解・受入、Node 24.22.1そのもの、本番データ・本番DB migration・deploy、モデルの実測予測精度は未検証。mainへの変更・push・PR・merge・deploy・大会提出物の編集は行っていない。
+
+## 追補：開始前の合計量の訂正
+
+2026-11-01の精査結果に対する依頼者の「じゃあそうしよう」に基づく。[P-26](../product-spec.md#p-26-開始前の合計量の訂正319)・[D-34](../architecture.md#d-34-開始前の合計量の訂正319)のローカル実装。記録後も開始前の合計を増減・0へ訂正でき、確認dialogで旧値・新値・符号付き差を示す。合計を置換し、日々のログ・開始日・timezone・単位の制限を保つ。追加migration・新API経路・Engine変更はない。
+
+### 検証
+
+- 全48 APIファイル315成功（shared 306＋milestone 9）、Prediction 77、Web 201、固定例32、計625成功。通常Web実行の既存skip 1件はブラウザ別実行の案内であり、既存Chrome 22件と保存差分の38シナリオを別途成功させた。証跡は`.local/319/initial-all-final.log`、`initial-r11-final.log`、`initial-native-final.log`、`initial-feedback-final.log`。
+- 追加API 7件は、増減・0、達成／未達・総量超過、同値再送、設定版CASの一勝一敗、日別保存との両立・古い日別入力の拒否、認可・入力・timezone／unit、DB失敗rollbackを検査する。日別行・履歴版・開始日・回答と版・観測遷移・posterior・未達時のg50/g80が不変であることも照合した。
+- 旧仕様に依存したテストは、初期量禁止の期待だけを新仕様へ更新した。timezone・単位・要求全体の原子性・private DOM除去・入力保持のassertionは維持し、初期量の送信・検査・取消後・409後の再確認を追加した。
+- 実Chrome＋既存の合成Goalで、確認前の書込0、取消時の入力保持、300→600分、0への訂正、409の入力保持と明示的再読込、503の入力保持、同owner session再確認、明示的再保存、日別行不変を確認した。`verify-initial-progress.js`と`verify-initial-failure.js`を使用し、合成Goalの初期量は確認後に元の値へ戻した。320/390/768/1440pxで横overflowなし。
+- typecheckとbuild成功。証跡は`.local/319/initial-typecheck-final.log`・`initial-build-final.log`。bundleの既存500KB警告は残る。文書同期後のFoundationも成功（`.local/319/initial-foundation-final.log`）。
+
+### 検証中の失敗と対処
+
+全体テストの初回はCドライブの空き容量0によりPostgreSQLの`No space left on device`で失敗した。テストやtimeoutを緩和せず、この専用worktree内で当日生成された`futureroi_test`所有の停止済み検証クラスタ107件だけを、絶対パス・PID fileなし・利用中クラスタ除外を確認して整理した。空き容量確保後、全件を再実行して成功した。失敗ログは`.local/319/initial-all.log`に保持した。
+
+既存Chrome回帰の初回1失敗は初期量disabledを要求する旧仕様のassertionだった。初期量が訂正可能でtimezoneは固定であることを検査する新契約へ更新し、他のsession/409/入力保持assertionを保ったまま22件を再実行して成功した。実Chromeの503確認スクリプトでは案内文の期待文字列の違いで一度timeoutしたが、実際の画面の案内に合わせ、更新失敗・再確認・再保存を最後まで再検証した。
+
+### 利用中ローカルDBの保全
+
+API更新前に専用クラスタをPID・port・所有者・対象Goalで特定し、全public tableのsnapshotを`.local/319/initial-before.json`へ退避した。現在の確認DBを新しくseedし直さずに再開し、3 Goal・123ログを維持した。ユーザーが作成したGoalとその日別記録が更新前と一致することを読み取りで確認した。利用中のDB directory・退避・ログイン情報はGit除外のままである。
+
+### 画像
+
+専用visualizationsフォルダの`initial-progress-desktop.png`・`initial-progress-mobile.png`に確認dialog、`initial-progress-after.png`に訂正後の累計・グラフ・完了見通しを保存した。画像は合成Goalのみ。
+
+### 追補の変更ファイル
+
+- [apps/api/src/contracts/goal.ts](../../apps/api/src/contracts/goal.ts)
+- [apps/api/src/goals/routes.ts](../../apps/api/src/goals/routes.ts)
+- [apps/api/src/goals/store.ts](../../apps/api/src/goals/store.ts)
+- [apps/api/tests/goals-concurrency.test.ts](../../apps/api/tests/goals-concurrency.test.ts)
+- [apps/api/tests/goals.test.ts](../../apps/api/tests/goals.test.ts)
+- [apps/api/tests/history-edit.test.ts](../../apps/api/tests/history-edit.test.ts)
+- [apps/api/tests/initial-progress.test.ts](../../apps/api/tests/initial-progress.test.ts)
+- [apps/api/tests/record-concurrency.test.ts](../../apps/api/tests/record-concurrency.test.ts)
+- [apps/web/src/copy/goals.ts](../../apps/web/src/copy/goals.ts)
+- [apps/web/src/features/goals/GoalFormPage.tsx](../../apps/web/src/features/goals/GoalFormPage.tsx)
+- [apps/web/src/features/goals/form/GoalFormFields.tsx](../../apps/web/src/features/goals/form/GoalFormFields.tsx)
+- [apps/web/src/features/goals/goal-form.ts](../../apps/web/src/features/goals/goal-form.ts)
+- [apps/web/src/ui/components/ConfirmDialog.tsx](../../apps/web/src/ui/components/ConfirmDialog.tsx)
+- [apps/web/tests/goal-form.test.mjs](../../apps/web/tests/goal-form.test.mjs)
+- [apps/web/tests/issue185-failure.browser.tsx](../../apps/web/tests/issue185-failure.browser.tsx)
+- [docs/architecture.md](../../docs/architecture.md)
+- [docs/change-map.md](../../docs/change-map.md)
+- [docs/changes/issue-319-goal-history.md](../../docs/changes/issue-319-goal-history.md)
+- [docs/product-spec.md](../../docs/product-spec.md)
+- [scripts/local-319/resume.ts](../../scripts/local-319/resume.ts)
+- [scripts/local-319/verify-initial-failure.js](../../scripts/local-319/verify-initial-failure.js)
+- [scripts/local-319/verify-initial-progress.js](../../scripts/local-319/verify-initial-progress.js)
+
+### 残る境界
+
+Safari/iOS実機・実screen reader・実利用者受入・Node 24.22.1そのもの・本番反映は未検証。初期量の変更前後を永続監査する機能と、開始前の日別記録の取り込みは含めない。旧クライアントの履歴版移行など、前段の統合前判断は引き続き残る。push/PR/merge/deployは行っていない。

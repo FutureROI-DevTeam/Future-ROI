@@ -68,7 +68,7 @@ test('historical edits preserve ownership, epochs, exact amounts and snapshot co
     assert.equal((await read()).progressDone,before.progressDone);
     await db.pool.query('drop trigger history_test_failure on action_log; drop function history_test_failure()');
   });
-  await t.test('cancellation does not unlock timezone or initial progress',async()=>{
+  await t.test('cancellation keeps timezone/unit locks while initial progress remains correctable',async()=>{
     const g=(await owner.call('POST','/api/goals',{title:'Locks',unit:'minutes',totalRequired:100,sessionAmount:1,timezone:'Asia/Tokyo'})).json!;
     const path='/api/goals/'+g.id;
     const edit=async(status:string)=>{
@@ -79,7 +79,9 @@ test('historical edits preserve ownership, epochs, exact amounts and snapshot co
     assert.equal((await edit('UNRECORDED')).status,200);
     const goal=(await owner.call('GET',path+'?view=r11')).json!;
     assert.equal(goal.hasLogs,false);
-    for(const patch of [{timezone:'UTC'},{initialProgress:1},{unit:'sessions'}]) assert.equal((await owner.sendExact('PATCH',path,{...patch,expectedGoalSettingsRevision:goal.goalSettingsRevision})).status,422);
+    for(const patch of [{timezone:'UTC'},{unit:'sessions'}]) assert.equal((await owner.sendExact('PATCH',path,{...patch,expectedGoalSettingsRevision:goal.goalSettingsRevision})).status,422);
+    const corrected=await owner.sendExact('PATCH',path,{initialProgress:1,expectedGoalSettingsRevision:goal.goalSettingsRevision});
+    assert.equal(corrected.status,200);assert.equal(corrected.json!.progressDone,1);assert.equal(corrected.json!.unitLocked,true);
   });
   await t.test('timezone midnight and DST use the Goal calendar date',async()=>{
     now=new Date('2026-03-07T12:00:00Z');
