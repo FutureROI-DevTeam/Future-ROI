@@ -7,7 +7,7 @@ export type FootprintGoal = Pick<Goal, 'id' | 'title' | 'unit' | 'timezone' | 'r
 export type FootprintSource = { goal: FootprintGoal; logs: readonly Log[] | null };
 export type FootprintDay = {
   date: string;
-  kind: 'done' | 'rest' | 'unrecorded' | 'unconfirmed' | 'before-start';
+  kind: 'done' | 'rest' | 'unrecorded' | 'unconfirmed' | 'before-start' | 'future';
   goals: FootprintGoal[];
   complete: boolean;
 };
@@ -43,7 +43,7 @@ function checkedLogs({ goal, logs }: FootprintSource): Map<string, Log> | null {
 }
 
 /** 単位量を合算せず、現在のGoalの同じ記録日をまとめる。UTCの実時間への変換はしない。 */
-export function buildFootprint(sources: readonly FootprintSource[], days = 28) {
+export function buildFootprint(sources: readonly FootprintSource[], days = 28, end?: string) {
   const unique = [...new Map(sources.map(source => [source.goal.id, source])).values()];
   const entries = unique.map(source => ({ ...source, records: checkedLogs(source) }));
   const today = entries.map(entry => entry.goal.today).sort().at(-1);
@@ -62,7 +62,7 @@ export function buildFootprint(sources: readonly FootprintSource[], days = 28) {
       date,
       goals,
       complete: !pending,
-      kind: goals.length ? 'done' : pending ? 'unconfirmed'
+      kind: date > today ? 'future' : goals.length ? 'done' : pending ? 'unconfirmed'
         : !active.length ? 'before-start' : rest ? 'rest' : 'unrecorded',
     };
   };
@@ -82,5 +82,5 @@ export function buildFootprint(sources: readonly FootprintSource[], days = 28) {
       }
     }
   }
-  return { today, days: Array.from({ length: days }, (_, index) => day(shift(today, index - days + 1))), streak, sameToday, complete };
+  return { today, days: Array.from({ length: days }, (_, index) => day(shift(end ?? today, index - days + 1))), streak, sameToday, complete };
 }

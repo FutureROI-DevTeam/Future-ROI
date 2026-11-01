@@ -365,8 +365,8 @@ body:has(.fr-page--today) { background: #eef3f5; }
 .fr-page--today .fr-core__value, .fr-page--today .fr-outlook__p50, .fr-page--today .fr-progress__percent { font-family: inherit; font-weight: 700; }
 .fr-page--today .fr-today__question, .fr-page--today .fr-outlook__title, .fr-page--today .fr-today__right .fr-section-label { font-weight: 700; }
 .fr-save-feedback {
-  min-height: calc(6.4em + 16px);
-  padding: 8px 22px;
+  min-height: 0;
+  padding: 0;
   box-sizing: border-box;
   font-size: 14px;
   line-height: 1.6;
@@ -409,3 +409,12 @@ body:has(.fr-page--today) { background: #eef3f5; }
   /* 右の見通しをキーボードで読む間は固定を外し、focus先を試算で覆わない。 */
   .fr-page--today .fr-today__right:focus-within > .fr-section:has(.fr-draft-preview) { position: static; }
 }
+
+
+.fr-save-delta { display:inline-block; margin-left:10px; font-size:14px; font-weight:600; white-space:nowrap; }
+.fr-chart-controls { display:flex; flex-wrap:wrap; gap:4px; }
+.fr-chart-controls [aria-pressed="true"] { background:var(--fr-rec-soft, #e9f1ed); color:var(--fr-rec); box-shadow:inset 0 0 0 1px currentColor; }
+.fr-chart-selection { display:flex; flex-direction:column; gap:4px; padding:12px; border-radius:12px; background:var(--fr-surface-2); font-size:14px; }
+.fr-chart:focus-visible { outline:2px solid var(--fr-rec); outline-offset:2px; }
+.fr-chart { touch-action:pan-y; }
+.fr-today__records > .fr-btn { margin-inline:12px; }

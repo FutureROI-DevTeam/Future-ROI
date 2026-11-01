@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import type { Log, LogPut } from '../contracts/log.ts';
+import type { Log, LogPut, HistoryEdit } from '../contracts/log.ts';
 import { isGoalId } from '../goals/goal-id.ts';
 import { localDateIn, shiftLocalDate } from '../goals/local-date.ts';
 
@@ -11,7 +11,7 @@ const toLog = (r: LogRow): Log => ({ localDate: r.local_date, status: r.status, 
 
 export type PutLogResult =
   | { kind: 'saved'; log: Log }
-  | { kind: 'not_found' | 'settings_conflict' }
+  | { kind: 'not_found' | 'settings_conflict' | 'history_conflict' }
   | { kind: 'out_of_window'; today: string; yesterday: string }
   | { kind: 'before_start'; recordStartDate: string };
 
@@ -31,8 +31,8 @@ export async function putLog(
   try {
     await client.query('begin isolation level read committed');
     const goal = (
-      await client.query<{ timezone: string; record_start_date: string; session_amount: number; goal_settings_revision: number }>(
-        'select timezone, record_start_date::text as record_start_date, session_amount, goal_settings_revision from goal where id = $1 and user_id = $2 for update',
+      await client.query<{ timezone: string; record_start_date: string; session_amount: number; goal_settings_revision: number; history_revision: string }>(
+        'select timezone, record_start_date::text as record_start_date, session_amount, goal_settings_revision, history_revision::text as history_revision from goal where id = $1 and user_id = $2 for update',
         [goalId, userId],
       )
     ).rows[0];
@@ -43,6 +43,10 @@ export async function putLog(
     if (body.expectedGoalSettingsRevision !== goal.goal_settings_revision) {
       await client.query('rollback');
       return { kind: 'settings_conflict' };
+    }
+    if (body.expectedHistoryRevision !== undefined && body.expectedHistoryRevision !== goal.history_revision) {
+      await client.query('rollback');
+      return { kind: 'history_conflict' };
     }
     const today = localDateIn(clock(), goal.timezone);
     const yesterday = shiftLocalDate(today, -1);
@@ -94,4 +98,35 @@ export async function listLogs(
     [goalId, range.from ?? null, range.to ?? null],
   );
   return rows.rows.map(toLog);
+}
+
+/** Explicit historical correction/cancellation. Same Goal lock and timezone clock as PUT. */
+export async function editHistory(pool: Pool, userId: string, goalId: string, localDate: string, body: HistoryEdit, clock: () => Date) {
+  if (!isGoalId(goalId)) return { kind: 'not_found' } as const;
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const goal = (await client.query<{ timezone: string; start: string; settings: number; revision: string }>(
+      'select timezone, record_start_date::text as start, goal_settings_revision as settings, history_revision::text as revision from goal where id=$1 and user_id=$2 for update', [goalId,userId])).rows[0];
+    if (!goal) { await client.query('rollback'); return { kind: 'not_found' } as const; }
+    if (goal.settings !== body.expectedGoalSettingsRevision || goal.revision !== body.expectedHistoryRevision) {
+      await client.query('rollback'); return { kind: 'conflict' } as const;
+    }
+    const today = localDateIn(clock(), goal.timezone);
+    if (localDate < goal.start || localDate > today) { await client.query('rollback'); return { kind: 'out_of_window' } as const; }
+    let log: Log | null = null;
+    if (body.status === 'UNRECORDED') {
+      await client.query('delete from action_log where goal_id=$1 and local_date=$2::date', [goalId,localDate]);
+    } else {
+      const result = await client.query<LogRow>(
+        'insert into action_log (goal_id,local_date,status,amount) values ($1,$2::date,$3,$4) on conflict (goal_id,local_date) do update set status=excluded.status,amount=excluded.amount returning local_date::text as local_date,status,amount',
+        [goalId,localDate,body.status,body.status === 'DONE' ? body.amount : null]);
+      log = toLog(result.rows[0]!);
+      if (body.status === 'DONE') await client.query('update goal set unit_history_locked=true where id=$1', [goalId]);
+    }
+    const revision = (await client.query<{ revision: string }>('select history_revision::text as revision from goal where id=$1',[goalId])).rows[0]!.revision;
+    await client.query('commit');
+    return { kind: 'saved', value: { historyRevision: revision, log } } as const;
+  } catch (error) { await client.query('rollback').catch(()=>{}); throw error; }
+  finally { client.release(); }
 }

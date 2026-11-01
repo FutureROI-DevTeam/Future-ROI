@@ -26,7 +26,6 @@ import { ForecastBoundary } from './ForecastBoundary.tsx';
 import { YesterdayDetails } from './YesterdayDetails.tsx';
 import { useTodayData } from './useTodayData.ts';
 import { TodayContent } from './TodayContent.tsx';
-import { SaveFeedback } from '../logs/SaveFeedback.tsx';
 import type { SaveFeedback as SaveFeedbackValue } from '../logs/save-feedback.ts';
 import { draftProgress, recordPreviewBaseline, type RecordDraft } from '../logs/draft-preview.ts';
 import { DraftProgressPreview } from './DraftProgressPreview.tsx';
@@ -211,7 +210,8 @@ function TodayScreen({ goalId, notBefore }: { goalId: string; notBefore: number 
   const recordDate = todayEditDate ?? today?.today ?? fallbackGoal?.today;
   const canRecordToday = recordDate !== undefined && todaySaver.canSaveDate(recordDate)
     && (!todaySaver.failure?.vars || todaySaver.canSaveDate(todaySaver.failure.vars.localDate));
-  const showChoices = today && goal ? unrecorded || (changing && today.todayLog != null) : fallbackGoal?.todayStatus === 'UNRECORDED';
+  const showChoices = recordDate !== undefined && recordGoal !== undefined && recordDate >= recordGoal.recordStartDate
+    && (today && goal ? unrecorded || (changing && today.todayLog != null) : fallbackGoal?.todayStatus === 'UNRECORDED');
   // 今日と昨日を同時に編集しない（#88）
   const locks = editLocks({
     changingToday: changing,
@@ -408,7 +408,7 @@ function TodayScreen({ goalId, notBefore }: { goalId: string; notBefore: number 
               <Loading />
             )}
 
-            <SaveFeedback value={validSnapshot && !changing && !amountEditing && !yesterdayEdit ? feedback : null} />
+
           </div>
 
           {goal && today && snapshot ? (
@@ -421,6 +421,7 @@ function TodayScreen({ goalId, notBefore }: { goalId: string; notBefore: number 
                 onYesterday={startYesterdayCorrection}
                 onToday={today.todayLog && !changing && !yesterdayEdit ? startTodayChange : undefined}
               />
+              <Link to="/goals/$goalId/history" params={{ goalId }} className="fr-btn fr-btn--text">履歴をすべて見る・編集する</Link>
               {yesterdayArea}
             </section>
           ) : null}
@@ -430,6 +431,7 @@ function TodayScreen({ goalId, notBefore }: { goalId: string; notBefore: number 
           {validSnapshot ? (
             <ForecastBoundary resetKey={todayQuery.dataUpdatedAt}>
               <TodayContent
+                feedback={validSnapshot && !changing && !amountEditing && !yesterdayEdit ? feedback : null}
                 area="details"
                 goal={snapshot.goal}
                 today={snapshot.today}

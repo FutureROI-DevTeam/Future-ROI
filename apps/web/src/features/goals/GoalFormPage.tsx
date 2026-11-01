@@ -250,7 +250,7 @@ function GoalForm({
 }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const locked = mode === 'edit' && goal.hasLogs;
+  const locked = mode === 'edit' && (goal.hasLogs || Number(goal.historyRevision ?? 0) > 0);
   const title = mode === 'create' ? f.createTitle : f.editTitle;
   // 回復情報は過去の送信結果が不明な証跡。最初の描画で1回だけ読む
   const [recovery] = useState(() => loadRecovery(owner, failure));

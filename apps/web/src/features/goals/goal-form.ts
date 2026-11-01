@@ -27,7 +27,7 @@ export type FormValues = {
 };
 
 /** 編集の比較元。R-11 の読み取り（?view=r11）で得た回答と版を持つ。 */
-export type GoalWithAnswers = Goal & { questionPrior?: QuestionAnswers; answerRevision?: number };
+export type GoalWithAnswers = Goal & { historyRevision?: string; questionPrior?: QuestionAnswers; answerRevision?: number };
 
 export const NO_ANSWERS: QuestionAnswers = { a: null, b: null };
 export type FieldName = keyof FormValues;
@@ -336,7 +336,7 @@ export function toPatchBody(values: FormValues, goal: GoalWithAnswers): GoalPatc
   if ((values.targetDate || null) !== (goal.targetDate ?? null)) {
     patch.targetDate = values.targetDate || null;
   }
-  if (!goal.hasLogs) {
+  if (!goal.hasLogs && !(Number(goal.historyRevision ?? 0) > 0)) {
     if (int(values.initialProgress) !== goal.initialProgress) {
       patch.initialProgress = int(values.initialProgress);
     }

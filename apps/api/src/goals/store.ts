@@ -39,10 +39,11 @@ type GoalRow = QuestionRow & {
   has_logs: boolean;
   unit_history_locked: boolean;
   goal_settings_revision: number;
+  history_revision: string;
 };
 
 const BASE_GOAL_COLUMNS = `g.id, g.title, g.unit, g.total_required, g.session_amount, g.initial_progress, g.timezone,
-  g.unit_history_locked, g.goal_settings_revision, g.record_start_date::text as record_start_date, g.target_date::text as target_date, g.question_prior, g.answer_revision::text as answer_revision, g.question_prior_snapshot`;
+  g.unit_history_locked, g.goal_settings_revision, g.history_revision::text as history_revision, g.record_start_date::text as record_start_date, g.target_date::text as target_date, g.question_prior, g.answer_revision::text as answer_revision, g.question_prior_snapshot`;
 const GOAL_COLUMNS = `${BASE_GOAL_COLUMNS},
   exists (select 1 from action_log l where l.goal_id = g.id) as has_logs`;
 
@@ -70,25 +71,25 @@ async function loadTodayStatuses(
  * 応答時点の今日までのDONE量。initialProgressを足すとTodayのprogress.doneに一致する。
  * 記録APIは開始日前・今日より後の行を作らず、Engineは受け取ったDONEをすべて足す。
  */
-async function loadDoneTotals(db: Queryable, rows: { goalId: string; today: string }[]): Promise<Map<string, number>> {
-  const totals = new Map<string, number>();
+async function loadDoneTotals(db: Queryable, rows: { goalId: string; today: string }[]): Promise<Map<string, { done: number; fingerprint: string }>> {
+  const totals = new Map<string, { done: number; fingerprint: string }>();
   if (rows.length === 0) {
     return totals;
   }
-  const result = await db.query<{ goal_id: string; done: string }>(
-    `select l.goal_id, sum(l.amount)::text as done from action_log l
+  const result = await db.query<{ goal_id: string; done: string; fingerprint: string }>(
+    `select l.goal_id, coalesce(sum(l.amount) filter (where l.status = 'DONE' and l.local_date <= t.today), 0)::text as done,
+       json_agg(json_build_array(l.local_date::text, l.status, l.amount) order by l.local_date)::text as fingerprint from action_log l
        join unnest($1::uuid[], $2::date[]) as t(goal_id, today) on l.goal_id = t.goal_id
-      where l.status = 'DONE' and l.local_date <= t.today
       group by l.goal_id`,
     [rows.map((r) => r.goalId), rows.map((r) => r.today)],
   );
   for (const r of result.rows) {
-    totals.set(r.goal_id, Number(r.done));
+    totals.set(r.goal_id, { done: Number(r.done), fingerprint: JSON.stringify(JSON.parse(r.fingerprint)) });
   }
   return totals;
 }
 
-export type GoalRead = Goal & { questionPrior: QuestionPriorAnswers; answerRevision: number };
+export type GoalRead = Goal & { historyRevision: string; historyFingerprint: string; questionPrior: QuestionPriorAnswers; answerRevision: number };
 async function loadGoalReadModels(db: Queryable, rows: GoalRow[], now: Date): Promise<GoalRead[]> {
   const todays = rows.map((r) => ({ goalId: r.id, today: localDateIn(now, r.timezone) }));
   const statuses = await loadTodayStatuses(db, todays);
@@ -111,9 +112,11 @@ async function loadGoalReadModels(db: Queryable, rows: GoalRow[], now: Date): Pr
       hasLogs: r.has_logs,
       unitLocked: r.unit_history_locked || r.initial_progress > 0,
       goalSettingsRevision: r.goal_settings_revision,
+      historyRevision: r.history_revision,
+      historyFingerprint: done.get(r.id)?.fingerprint ?? '[]',
       today: todays[i]!.today,
       todayStatus: statuses.get(r.id) ?? 'UNRECORDED',
-      progressDone: r.initial_progress + (done.get(r.id) ?? 0),
+      progressDone: r.initial_progress + (done.get(r.id)?.done ?? 0),
       targetDate: r.target_date,
       questionPrior: saved.answers,
       answerRevision: saved.revision,
@@ -309,7 +312,7 @@ export async function updateGoal(
     // READ COMMITTED takes a fresh snapshot after any Goal lock wait. A first log
     // committed by the shared-lock holder must be visible before checking R-02.
     const hasLogs = (await client.query<{ has_logs: boolean }>('select exists (select 1 from action_log where goal_id = $1) as has_logs', [goalId])).rows[0]!.has_logs;
-    if (hasLogs) {
+    if (hasLogs || BigInt(current.history_revision) > 0n) {
       const locked: LockedField[] = [];
       if (patch.timezone !== undefined && patch.timezone !== current.timezone) {
         locked.push('timezone');

@@ -16,6 +16,9 @@ import type { GoalR11 as Goal, Log, TodayR11 as Today } from '@contracts';
  * - 昨日の記録の有無：Today の yesterdayMissing と、記録の一覧に昨日の行があるか（昨日が記録開始日以降のとき）
  */
 export function isSameSnapshot(goal: Goal, today: Today, logs: readonly Log[]): boolean {
+  if (goal.historyRevision !== today.context.historyRevision) return false;
+  if (today.context.historyFingerprint !== undefined
+    && today.context.historyFingerprint !== JSON.stringify([...logs].sort((a,b) => a.localDate.localeCompare(b.localDate)).map(log => [log.localDate, log.status, log.amount]))) return false;
   if (goal.today !== today.today) {
     return false;
   }

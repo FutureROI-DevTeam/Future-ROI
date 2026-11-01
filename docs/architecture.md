@@ -410,6 +410,8 @@ CREATE TABLE action_log (
 
 ### 記録の上書きと予測の再計算
 
+専用ローカルブランチの過去編集・取消と履歴版は[D-33](#d-33-過去記録の編集と履歴版319ローカル検証)を参照する。以下の従来PUTの窓は維持する。
+
 行動日は`localDate`（DBの`local_date`）、入力・更新時刻は`created_at` / `updated_at`であり、後者から行動日を推測しない。保存対象の日付と今日・昨日の判定はGoalのtimezoneでそろえる。UNKNOWNは行がない状態で、記録取消用DELETEは現行契約にない。
 
 前日補完・訂正には、昨日が開始日以降という条件も必要。#77で`yesterdayMissing`をこの条件込み（昨日が記録開始日以降かつ未記録）で返す実装案を用意し、画面はこのflagだけで問いかけを出せる（[記録・Today API](#2026-10-06の記録today-api77)）。
@@ -933,3 +935,24 @@ Consequences / Reconsideration: 未記録による打切り/区間の機構、�
 参加PUTはreportのconsentRevisionをexpectedConsentRevisionとして照合し、受理/撤回時にGoal上の単調CAS版を進める。古い受理要求の再送による撤回後・期限切れ/purge後の参加復活を拒否する。有効参加を作った同一要求だけを再送可能とし、期限は延ばさない。このGoal metadataには同意履歴や予測labelを残さず、Goal削除で消す。予測contextは編集可否markerのunitLockedを除き、意味を変える設定・質問・build・prefixを保持する。JS/SQLの90日上限は経過2160時間に統一し、DB session timezoneのDSTへ依存させない。詳細と回帰は[設計補助](prediction/milestone-calibration.md#同意cas予測文脈保持期間の追加確認)を参照する。
 
 D-248のGoal UUIDは既存Goal APIの大文字/小文字許可を保持し、補正route境界で正規表記へそろえてscopeを比較する。本人IDを大小変換せず、所有者・参加世代・hashの照合を維持する。
+
+
+### D-33 過去記録の編集と履歴版（#319、ローカル検証）
+
+2026-11-01 / **依頼者承認のローカル実装・検証。main統合・本番migration・チーム採択は未実施。** [P-25](product-spec.md#p-25-goal詳細と過去記録のローカル改善319)を対象とする。
+
+**Context / Decision：** 過去訂正では、日付を入れ替えたりSKIPPEDを削除した場合、累計が同じでも遷移件数・予測が変わる。また行削除後に「行がない」だけを検査すると、古い画面からの再作成を検出できない。このためGoal単位の単調な履歴版を保持し、設定版と合わせて編集開始時の状態を検査する。
+
+- migration `0009_record_history_revision.sql`で`goal.history_revision`（非負bigint）を追加する。action_logの実変更・削除で同transactionのtriggerが版を進める。同値のUPDATEでは進めず、削除後もGoalに版が残る。既存PUT・合成seed経由の変更も検知する。初期値0は導入前の全履歴の基準epochであり、過去の編集回数を捏造しない。
+- `PATCH /api/goals/:goalId/logs/:localDate`のbodyは`status: DONE | SKIPPED | UNRECORDED`、`expectedGoalSettingsRevision`、文字列`expectedHistoryRevision`。DONEは正整数amount必須、他の状態はamount禁止。UNRECORDEDは明示的な取消で、DBの行を削除する。空の行・0量・UNKNOWN値をaction_logへ保存しない。
+- 所有者条件付きGoal行をFOR UPDATEしてから時計を取り、Goal timezoneで開始日〜今日の範囲を検査する。版不一致は409 HISTORY_CONFLICT、他人・存在しないGoalは404、不正量・日付は422。成功は`{ historyRevision, log }`（削除時logはnull）。失敗時は行と版を同時にrollbackする。別の日の編集でも競合する保守的な粒度であり、無断の自動上書きを避ける。
+- 従来PUTの今日・昨日の窓は変更しない。後方互換のためhistory版は省略可能だが、現在のFEは取得済みの版を送る。版を省略する旧クライアントには新しい履歴CASの保証はない。正式統合時に旧クライアントの移行・必須化を判断する。
+- Goal R-11 DTOのhistoryRevisionとToday contextのhistoryRevisionを照合する。履歴画面はGoalの同一snapshotに含めたhistoryFingerprintとログ一覧を照合し、予測APIの成功には依存しない。Todayには同一REPEATABLE READ snapshotの全ログから作るhistoryFingerprint（日付順のdate/status/amountのJSON配列）を付け、FEがログ一覧と照合する。累計一致だけを根拠に古い予測を採用しない。既存応答fixtureとの互換用に追加メタデータは型上optionalだが、実DBのR-11経路では返す。旧Goal DTOの形は変更しない。
+- session確認中は私的DOMを取り除き、継続した同一所有者の未保存入力だけを既存memory draftへ保持する。所有者変更・logout・session失敗で破棄する。編集対象日は開始時に固定し、30秒ごとの日付境界再取得で別の日へ移さない。
+- 保存後はGoal配下の一覧・Today・履歴cacheを無効化して再取得する。以前の整合表示を保持する場合も再取得失敗を表示し、編集を停止する。競合や成否不明時はdraftを保持し、利用者による最新履歴の読み込みと明示保存を必要とする。保存差分は、さらに前後の履歴版が1だけ進んだ場合に限る。
+
+**Alternatives / Reason：** 日ごとの版だけでは未記録・削除・再作成の競合に別の墓標が必要。updated_atだけでは同値への往復と削除を安全に識別できない。Goal単位の版は競合が広い反面、既存のGoal行lockを再利用でき、別テーブルや新技術を要しない。累計照合だけでは同累計の遷移変更を見逃すため、履歴内容も照合する。チャートライブラリ移行は、既存SVGで期間・選択・読み上げを満たせるため行わない。
+
+**Invariants / Non-goals / Consequences：** 所有権、固定記録開始日、整数分、DONE正整数、SKIPPED NULL、UNKNOWN行なし、永続unit lockを保つ。全記録を取り消してもtimezone・初期量の既存の編集制限は解除しない。Engineやg50/P50/P80は不変。公開・本番DB・モデル精度・実利用者受入は対象外。fingerprintは全履歴サイズに比例するため、長期利用の通信量が問題になればversion付き一覧DTO等を比較する。高頻度の別日編集が問題になる場合は競合粒度を再検討する。
+
+**Evidence：** [API回帰](../apps/api/tests/history-edit.test.ts)、[FE照合・累積回帰](../apps/web/tests/history-edit.test.mjs)、既存Chrome回帰と[ローカル検証記録](changes/issue-319-goal-history.md)。テスト成功を本番採択や予測精度の証明にしない。

@@ -15,6 +15,7 @@ export function buildR11Today(snapshot: TodaySnapshot): TodayR11 {
   // 回答版も同じDB snapshotから返す。保存回答snapshotの文脈や設定版の意味は変えない。
   const context = {
     ...answerContext,
+    ...(snapshot.goal.historyRevision === undefined ? {} : { historyRevision: snapshot.goal.historyRevision, historyFingerprint: JSON.stringify(snapshot.logs.map(log => [log.localDate, log.status, log.amount])) }),
     goalSettingsRevision: snapshot.goal.goalSettingsRevision,
     answerRevision: saved.revision,
     unitLocked: snapshot.goal.unitLocked,

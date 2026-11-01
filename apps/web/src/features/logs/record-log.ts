@@ -60,7 +60,7 @@ export function classifySaveError(error: unknown): SaveFailureKind {
   if (isUnauthenticated(error)) {
     return 'signed-out';
   }
-  if (error instanceof ApiError && error.status === 409 && error.body?.error.code === 'GOAL_SETTINGS_CONFLICT') {
+  if (error instanceof ApiError && error.status === 409 && (error.body?.error.code === 'GOAL_SETTINGS_CONFLICT' || error.body?.error.code === 'HISTORY_CONFLICT')) {
     return 'settings';
   }
   if (error instanceof ApiError && error.status === 422) {

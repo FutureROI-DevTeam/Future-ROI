@@ -10,6 +10,7 @@ export type TodaySnapshot = {
     recordStartDate: string;
     unit: 'minutes' | 'sessions';
     goalSettingsRevision: number;
+    historyRevision?: string;
     unitLocked: boolean;
   };
   question: QuestionRow;
@@ -25,6 +26,7 @@ export type SnapshotGoalRow = {
   record_start_date: string;
   unit: 'minutes' | 'sessions';
   goal_settings_revision: number;
+  history_revision?: string;
   unit_history_locked: boolean;
 } & QuestionRow;
 
@@ -50,6 +52,7 @@ export function toTodaySnapshot(
       recordStartDate: goal.record_start_date,
       unit: goal.unit,
       goalSettingsRevision: goal.goal_settings_revision,
+      ...(goal.history_revision === undefined ? {} : { historyRevision: goal.history_revision }),
       unitLocked: goal.unit_history_locked || goal.initial_progress > 0,
     },
     question: {

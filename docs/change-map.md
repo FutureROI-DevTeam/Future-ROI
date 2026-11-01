@@ -232,3 +232,10 @@ TodayのP80計算範囲の文言（[#154](https://github.com/jogi-hack-2026-team
 [純粋境界回帰](../apps/web/tests/goal-feedback.test.mjs)、[実Chromeの画面・操作回帰](../apps/web/tests/goal-feedback.browser-check.mjs)、[検証範囲と残判断](changes/issue-244-goal-feedback.md)へ参照する。P-18採択当時の入力限定をP-23が追加する。既存の[#157検証](changes/issue-157-review-regression.md)は当時の記録として保ち、同日並行上書きの差分保証や人間の受入を完了扱いにしない。
 
 10月12日の追加は[未保存試算とsnapshot固定](../apps/web/src/features/logs/draft-preview.ts) → [試算表示](../apps/web/src/features/today/DraftProgressPreview.tsx)、[共通足跡の集計](../apps/web/src/features/goals/footprint.ts) → [日付選択UI](../apps/web/src/features/goals/GoalFootprint.tsx) → [一覧で既存全件履歴を取得](../apps/web/src/features/goals/GoalListPage.tsx)、[小さい進捗率の表示](../apps/web/src/copy/progress.ts)で追う。[足跡境界回帰](../apps/web/tests/footprint.test.mjs)は未確認・timezone・訂正・削除・重複・日付境界を検査する。新規API・保存先・量の合算は設けない。
+
+
+## Goal詳細のローカル改善（#319）
+
+[P-25](product-spec.md#p-25-goal詳細と過去記録のローカル改善319)と[D-33](architecture.md#d-33-過去記録の編集と履歴版319ローカル検証)を、[logs/routes.ts](../apps/api/src/logs/routes.ts)・[store.ts](../apps/api/src/logs/store.ts)・[0009 migration](../apps/api/migrations/0009_record_history_revision.sql)へ接続する。表示の履歴版・内容照合は[snapshot.ts](../apps/web/src/features/today/snapshot.ts)、日付編集は[HistoryPage](../apps/web/src/features/history/HistoryPage.tsx) → [HistoryEditor](../apps/web/src/features/history/HistoryEditor.tsx)、グラフは[ProgressSummary](../apps/web/src/features/today/ProgressSummary.tsx) → [history-model](../apps/web/src/features/history/history-model.ts)、全Goalの月送りは[GoalFootprint](../apps/web/src/features/goals/GoalFootprint.tsx)が担う。
+
+[API回帰](../apps/api/tests/history-edit.test.ts)は同時編集・取消後の古い版・同累計の履歴変更・認可・失敗rollback・DSTを、[FE回帰](../apps/web/tests/history-edit.test.mjs)は期間前累計・未記録と休み・履歴内容のずれを検査する。既存の保存・session・レスポンシブChrome回帰と、専用ローカルDBにつないだ実画面の確認は[検証記録](changes/issue-319-goal-history.md)へ追跡する。ローカル実装の状態であり、main統合・本番migration・人間受入は含まない。

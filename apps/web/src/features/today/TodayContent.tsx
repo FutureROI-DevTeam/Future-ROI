@@ -1,3 +1,4 @@
+import type { SaveFeedback } from '../logs/save-feedback.ts';
 import { Fragment } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { GoalR11 as Goal, Log, TodayR11 as Today } from '@contracts';
@@ -22,6 +23,7 @@ export function TodayContent({
   changeDisabled,
   onChange,
   preview = null,
+  feedback = null,
 }: {
   area: 'primary' | 'details' | 'history';
   goal: Goal;
@@ -33,6 +35,7 @@ export function TodayContent({
   changeDisabled: boolean;
   onChange: () => void;
   preview?: DraftProgress | null;
+  feedback?: SaveFeedback | null;
 }) {
   // Boundary 内で変換・検査し、失敗しても記録の2択を残す。出所・plan は API の値を使う。
   const view = toForecastView(today.prediction, goal.unit, {
@@ -47,6 +50,7 @@ export function TodayContent({
   if (area === 'history') {
     return hasProgress ? (
       <ProgressDetails
+        goalId={goal.id}
         progress={view.progress}
         initialProgress={goal.initialProgress}
         logs={logs}
@@ -59,6 +63,7 @@ export function TodayContent({
   const progress =
     hasProgress ? (
       <ProgressSummary
+        feedback={feedback}
         showDetails={false}
         preview={preview}
         brief={view.kind === 'forecast' || view.kind === 'today-recorded'

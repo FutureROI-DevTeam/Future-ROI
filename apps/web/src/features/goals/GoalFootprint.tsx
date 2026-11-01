@@ -1,19 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { longDate, shortDate, parseLocalDate } from '../../copy/date.ts';
+import { addDays, longDate, shortDate, parseLocalDate } from '../../copy/date.ts';
+import { monthCells, shiftMonth } from '../history/calendar.ts';
+import { todayCopy } from '../../copy/today.ts';
 import { Button } from '../../ui/components/Button.tsx';
 import { buildFootprint, type FootprintSource } from './footprint.ts';
 
 /** 日の種類 → 読み上げ・選択日の表示に使う文言。 */
-const DAY_KIND_LABELS = { done: '実施', rest: '休みの記録あり', unrecorded: '実施の記録なし', unconfirmed: '未確認', 'before-start': '記録開始前' } as const;
+const DAY_KIND_LABELS = { done: '実施', rest: '休みの記録あり', unrecorded: '実施の記録なし', unconfirmed: '未確認', 'before-start': '記録開始前', future: '未来の日付' } as const;
 /** 矢印キーで動く日数。上下は2週間（帯は2段で表示するため）。 */
 const ARROW_KEY_STEPS: Readonly<Record<string, number>> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -14, ArrowDown: 14 };
 
 /** 一覧上部に一つだけ置く全Goal共通の足跡。取得・保存はPageが担う。 */
 export function GoalFootprint({ sources, onRefresh }: { sources: readonly FootprintSource[]; onRefresh: () => void }) {
-  const footprint = buildFootprint(sources);
+  const [month, setMonth] = useState<string | null>(null);
+  const current = buildFootprint(sources);
+  const last = current.today?.slice(0,7) ?? '';
+  const first = sources.map(source=>source.goal.recordStartDate.slice(0,7)).sort()[0] ?? last;
+  const shown = month === null ? last : month < first ? first : month > last ? last : month;
+  const dates = shown ? monthCells(shown).filter((date):date is string=>date!==null) : [];
+  const footprint = buildFootprint(sources, dates.length, dates.at(-1));
   const [selected, setSelected] = useState<string | null>(null);
-  const date = footprint.days.some(day => day.date === selected) ? selected : footprint.today;
+  const date = footprint.days.some(day => day.date === selected) ? selected : footprint.days.filter(day=>day.date<=(footprint.today ?? '')).at(-1)?.date ?? footprint.days[0]?.date;
   const active = footprint.days.find(day => day.date === date);
   const scroller = useRef<HTMLDivElement>(null);
   const keyboardFocus = useRef(false);
@@ -30,9 +38,15 @@ export function GoalFootprint({ sources, onRefresh }: { sources: readonly Footpr
   if (!footprint.today) return null;
   return <section className="fr-footprint" aria-labelledby="fr-footprint-title">
     <header className="fr-footprint__head">
-      <h2 id="fr-footprint-title">取り組みの足跡 <span>最近4週間</span></h2>
+      <h2 id="fr-footprint-title">取り組みの足跡 <span>{todayCopy.monthLabel(shown)}</span></h2>
       <span className="fr-footprint__streak">{footprint.streak === null ? '連続実施は確認中' : `連続実施 ${footprint.streak}日`}</span>
     </header>
+    <div className="fr-footprint__months" role="group" aria-label="足跡の表示月">
+      <Button variant="text" aria-label="足跡の前の月" disabled={shown<=first} onClick={()=>setMonth(shiftMonth(shown,-1))}>← 前の月</Button>
+      <span aria-live="polite">{todayCopy.monthLabel(shown)}</span>
+      <Button variant="text" aria-label="足跡の次の月" disabled={shown>=last} onClick={()=>setMonth(shiftMonth(shown,1))}>次の月 →</Button>
+      <Button variant="text" disabled={shown===last} onClick={()=>setMonth(last)}>今月へ戻る</Button>
+    </div>
     <div className="fr-footprint__scroll" ref={scroller}>
       <div className="fr-footprint__days" aria-label="日付を選ぶと取り組んだGoalが表示されます">
         {footprint.days.map((day, index) => <button key={day.date} type="button"
@@ -41,6 +55,18 @@ export function GoalFootprint({ sources, onRefresh }: { sources: readonly Footpr
           aria-pressed={day.date === date} tabIndex={day.date === date ? 0 : -1}
           onClick={() => setSelected(day.date)} onKeyDown={event => {
             const move = ARROW_KEY_STEPS[event.key];
+            if (move !== undefined) {
+              const targetDate = addDays(day.date, move).toISOString().slice(0,10);
+              const targetMonth = targetDate.slice(0,7);
+              if (targetMonth !== shown) {
+                event.preventDefault();
+                if (targetMonth < first || targetMonth > last) return;
+                keyboardFocus.current = true;
+                setMonth(targetMonth);
+                setSelected(targetDate);
+                return;
+              }
+            }
             const next = event.key === 'Home' ? 0
               : event.key === 'End' ? footprint.days.length - 1
               : move !== undefined ? index + move : null;

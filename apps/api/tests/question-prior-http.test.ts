@@ -51,8 +51,9 @@ test('R11 HTTP読取: 明示queryだけ専用DTO、既定Goal/Todayと書込応�
   const read = goalR11(await owner.call('GET', `/api/goals/${id}?view=r11`));
   assert.deepEqual(read.questionPrior, answers);
   assert.equal(read.answerRevision, 0);
+  assert.equal(read.historyRevision, '0');
   const today = todayR11(await owner.call('GET', `/api/goals/${id}/today?view=r11`));
-  assert.deepEqual(today.context, { recordStartDate: '2026-10-07', unit: 'minutes', sessionAmount: 10, unitLocked: false, goalSettingsRevision: 0, answerRevision: 0 });
+  assert.deepEqual(today.context, { historyRevision: '0', historyFingerprint: '[]', recordStartDate: '2026-10-07', unit: 'minutes', sessionAmount: 10, unitLocked: false, goalSettingsRevision: 0, answerRevision: 0 });
   const { answerRevision: _removed, ...oldContext } = today.context;
   assert.ok(!Value.Check(TodayR11, { ...today, context: oldContext }), '回答版は必須で、旧contextへフォールバックしない');
   for (const answerRevision of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, '0']) {
@@ -177,7 +178,7 @@ test('R11 HTTP予測: 実遷移と回答の出所を分け、撤回/文脈変更
   saved = goalR11(await owner.call('GET', `${url}?view=r11`));
   assert.deepEqual(saved.questionPrior, { a: null, b: null }); assert.equal(saved.answerRevision, 2);
   const cleared = todayR11(await owner.call('GET', `${url}/today?view=r11`));
-  assert.deepEqual(cleared.context, { recordStartDate: '2026-10-05', unit: 'minutes', sessionAmount: 4, goalSettingsRevision: 2, answerRevision: 2, unitLocked: true });
+  assert.deepEqual(cleared.context, { historyRevision: '2', historyFingerprint: JSON.stringify([['2026-10-05', 'SKIPPED', null], ['2026-10-06', 'DONE', 7]]), recordStartDate: '2026-10-05', unit: 'minutes', sessionAmount: 4, goalSettingsRevision: 2, answerRevision: 2, unitLocked: true });
   assert.deepEqual(cleared.provenance, { a: 'NONE', b: 'RECORDS' });
   assert.equal(cleared.prediction.progress.done, 7);
   assert.deepEqual(cleared.plan, { remainingAmount: 118, remainingSessions: 30, lastSessionAmount: 2 });

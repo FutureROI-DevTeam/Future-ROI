@@ -637,3 +637,6 @@
 @media (max-width: 959px) {
   .fr-footprint { padding: 10px 12px; }
 }
+
+.fr-footprint__months { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; font-size:14px; }
+.fr-footprint__day--future { opacity:.55; }
