@@ -18,7 +18,7 @@ Node 24.21.0 / npm 11.19.0で実行。checkoutが要求するNode 24.22.1その�
 現在のローカル確認DBを保持して再起動する場合は、API terminalで`node scripts/local-319/resume.ts`を使う。Git除外の`.local/319/preserved-runtime.json`で本人確認済みのloopback DBのみ再開し、seed・migration・DB作成・削除はしない。停止済みなら既存data directoryを再開する。開発用認証Secretは再起動で変わるため、再ログインが必要になる。設定ファイルがない別checkoutでは次の新規合成DB用手順を使う。
 
 1. Node 24をPATHへ設定し、`npm run build:prediction`、`node scripts/local-319/server.ts`を起動する（APIは127.0.0.1:4319）。
-2. 別terminalでPowerShellの`$env:API_PROXY_TARGET='http://127.0.0.1:4319'`を設定し、`npm run dev:web -- --port 5319 --strictPort`を起動する。
+2. 別terminalでPowerShellの`$env:API_PROXY_TARGET='http://127.0.0.1:4319'`を設定し、`npm run dev --workspace=@futureroi/web -- --port 5319 --strictPort`を起動する。workspaceのdevへ直接引数を渡す（rootのdev:webを経由するとnpm自身がport引数を解釈してしまう）。
 3. [ローカルログイン](http://127.0.0.1:5319/login)を開き、session.jsonの合成アカウントで確認する。Goal IDは起動ごとに変わる。
 
 ## 実装と修正
