@@ -154,6 +154,14 @@ test('same-owner draft: actual router/hooks preserve idle input only across succ
   t.diagnostic(JSON.stringify(result));
 });
 
+test('#319 history lifecycle: URL entry, same-owner confirmation, unmounted saves and owner changes', { timeout: 180000 }, async (t) => {
+  const result = await runBrowser(t, './history-lifecycle.browser.tsx', false);
+  assert.equal(result.results.length, 4);
+  assert.equal(result.saves, 2);
+  assert.equal(result.writes, 0);
+  t.diagnostic(JSON.stringify(result));
+});
+
 test('#191 Today boundaries: response ordering, cancelled retry, and batched draft invalidation', { timeout: 180000 }, async (t) => {
   const result = await runBrowser(t, './session-today-boundary.browser.tsx', false, true);
   assert.equal(result.results.length, 13);

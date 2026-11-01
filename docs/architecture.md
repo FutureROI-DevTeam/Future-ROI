@@ -951,11 +951,13 @@ D-248のGoal UUIDは既存Goal APIの大文字/小文字許可を保持し、補
 - session確認中は私的DOMを取り除き、継続した同一所有者の未保存入力だけを既存memory draftへ保持する。所有者変更・logout・session失敗で破棄する。編集対象日は開始時に固定し、30秒ごとの日付境界再取得で別の日へ移さない。
 - 保存後はGoal配下の一覧・Today・履歴cacheを無効化して再取得する。以前の整合表示を保持する場合も再取得失敗を表示し、編集を停止する。競合や成否不明時はdraftを保持し、利用者による最新履歴の読み込みと明示保存を必要とする。保存差分は、さらに前後の履歴版が1だけ進んだ場合に限る。
 
+2026-11-02のセルフレビュー修正：過去編集は従来PUTと同じく明示的なREAD COMMITTEDを使い、Goal lock待ち後の最新履歴版を検査する。poolの既定値がREPEATABLE READでもserialization errorへ逸れず、古い編集は409へ至る。保存成功後のcache更新は画面のmount寿命から分離し、同一owner・draft世代が継続する場合だけ行う（離脱後の古いToday表示を防ぎ、別ownerへは持ち越さない）。URLの日付は訪問時の初期選択であり、同owner再確認ではその後の選択日・編集中入力を復元する。URLの日付自体が変わった場合は別の訪問として入力を破棄する。
+
 **Alternatives / Reason：** 日ごとの版だけでは未記録・削除・再作成の競合に別の墓標が必要。updated_atだけでは同値への往復と削除を安全に識別できない。Goal単位の版は競合が広い反面、既存のGoal行lockを再利用でき、別テーブルや新技術を要しない。累計照合だけでは同累計の遷移変更を見逃すため、履歴内容も照合する。チャートライブラリ移行は、既存SVGで期間・選択・読み上げを満たせるため行わない。
 
 **Invariants / Non-goals / Consequences：** 所有権、固定記録開始日、整数分、DONE正整数、SKIPPED NULL、UNKNOWN行なし、永続unit lockを保つ。全記録を取り消してもtimezone・初期量の既存の編集制限は解除しない。Engineやg50/P50/P80は不変。公開・本番DB・モデル精度・実利用者受入は対象外。fingerprintは全履歴サイズに比例するため、長期利用の通信量が問題になればversion付き一覧DTO等を比較する。高頻度の別日編集が問題になる場合は競合粒度を再検討する。
 
-**Evidence：** [API回帰](../apps/api/tests/history-edit.test.ts)、[FE照合・累積回帰](../apps/web/tests/history-edit.test.mjs)、既存Chrome回帰と[ローカル検証記録](changes/issue-319-goal-history.md)。テスト成功を本番採択や予測精度の証明にしない。
+**Evidence：** [API回帰](../apps/api/tests/history-edit.test.ts)、[DB既定分離レベルとlock待ちの回帰](../apps/api/tests/history-edit-concurrency.test.ts)、[FE照合・累積回帰](../apps/web/tests/history-edit.test.mjs)、[履歴画面の寿命・所有者回帰](../apps/web/tests/history-lifecycle.browser.tsx)、既存Chrome回帰と[ローカル検証記録](changes/issue-319-goal-history.md)。テスト成功を本番採択や予測精度の証明にしない。
 
 ### D-34 開始前の合計量の訂正（#319）
 

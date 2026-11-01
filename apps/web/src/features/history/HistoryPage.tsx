@@ -36,20 +36,21 @@ const WEEKDAY_HEADERS_FROM_MONDAY = ['月', '火', '水', '木', '金', '土', '
  */
 export function HistoryPage({ goalId, initialDate }: { goalId: string; initialDate?: string | undefined }) {
   const current = usePrivateEpoch();
-  const draft = useMemoryDraft<HistoryMemory>(current, `history:${goalId}`);
+  const draft = useMemoryDraft<HistoryMemory>(current, `history:${goalId}:${initialDate ?? ''}`);
   if (!privateDataReady(current)) {
     return <HistoryWaiting goalId={goalId} signedOut={current.owner === null} />;
   }
   const restored = draft.restored && typeof draft.restored === 'object' ? draft.restored : undefined;
-  const memory = initialDate && restored?.editor && restored.editor.date !== initialDate ? { ...restored, selected: initialDate, editor: null } : restored;
+  // The URL chooses the initial day of a visit; a healthy recheck restores the user's later selection.
+  const memory = restored;
   // 利用者が替わったら表示月も捨てる。旧cacheの消去が完了するまで取得部品をmountしない。
   return (
     <PrivateHistory
-      key={`${current.owner}:${goalId}:${draft.generation}`}
+      key={`${current.owner}:${goalId}:${initialDate ?? ''}:${draft.generation}`}
       goalId={goalId}
       clearedAt={current.clearedAt}
       initialDate={initialDate}
-      initialMonth={initialDate && /^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(initialDate) ? initialDate.slice(0,7) : memory?.month}
+      initialMonth={memory?.month ?? (initialDate && /^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(initialDate) ? initialDate.slice(0,7) : undefined)}
       initialMemory={memory}
       onRemember={draft.remember}
     />
@@ -85,7 +86,7 @@ function PrivateHistory({ goalId, clearedAt, initialMonth, onRemember, initialMe
   initialMemory?: HistoryMemory | undefined;
 }) {
   const { goalQuery, logsQuery, snapshot, refresh, resyncFailed } = useHistoryData(goalId, clearedAt);
-  const [selected,setSelected] = useState<string|null>(initialMemory?.editor?.date ?? initialDate ?? initialMemory?.selected ?? null);
+  const [selected,setSelected] = useState<string|null>(initialMemory?.editor?.date ?? initialMemory?.selected ?? initialDate ?? null);
   const [editing,setEditing] = useState(!!initialMemory?.editor);
   const [editorDraft,setEditorDraft] = useState<HistoryDraft|null>(initialMemory?.editor ?? null);
   const [message,setMessage] = useState<string|null>(null);

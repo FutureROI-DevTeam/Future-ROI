@@ -240,6 +240,8 @@ TodayのP80計算範囲の文言（[#154](https://github.com/jogi-hack-2026-team
 
 [API回帰](../apps/api/tests/history-edit.test.ts)は同時編集・取消後の古い版・同累計の履歴変更・認可・失敗rollback・DSTを、[FE回帰](../apps/web/tests/history-edit.test.mjs)は期間前累計・未記録と休み・履歴内容のずれを検査する。既存の保存・session・レスポンシブChrome回帰と、専用ローカルDBにつないだ実画面の確認は[検証記録](changes/issue-319-goal-history.md)へ追跡する。ローカル実装の状態であり、main統合・本番migration・人間受入は含まない。
 
+セルフレビューで発見したlock待ち後の古い版は[分離レベル回帰](../apps/api/tests/history-edit-concurrency.test.ts)、URL初期日と復元入力・離脱後のcache更新・別ownerへの遅延保存は[実Chrome回帰](../apps/web/tests/history-lifecycle.browser.tsx)（既存[runner](../apps/web/tests/session-cache.browser-check.mjs)に登録）で検査する。
+
 ### 開始前の合計量の訂正（#319追補）
 
 [P-26](product-spec.md#p-26-開始前の合計量の訂正319)・[D-34](architecture.md#d-34-開始前の合計量の訂正319)は[Goal store](../apps/api/src/goals/store.ts)、[GoalFormPage](../apps/web/src/features/goals/GoalFormPage.tsx)、[入力と送信](../apps/web/src/features/goals/goal-form.ts)で実現する。初期量の訂正は設定版、日別の訂正は履歴版で表し、Today照合・累積グラフは既存経路を再利用する。[追加API回帰](../apps/api/tests/initial-progress.test.ts)は増減/0・達成/未達・同値/古い版・並行保存・rollback・認可・固定項目を、[フォーム回帰](../apps/web/tests/goal-form.test.mjs)と[session回復回帰](../apps/web/tests/issue185-failure.browser.tsx)は入力・送信・回復を検査する。実Chromeの確認・更新失敗・4画面幅の記録は[操作スクリプト](../scripts/local-319/verify-initial-progress.js)・[失敗回復スクリプト](../scripts/local-319/verify-initial-failure.js)と[検証記録](changes/issue-319-goal-history.md)へ追跡する。

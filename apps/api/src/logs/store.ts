@@ -105,7 +105,7 @@ export async function editHistory(pool: Pool, userId: string, goalId: string, lo
   if (!isGoalId(goalId)) return { kind: 'not_found' } as const;
   const client = await pool.connect();
   try {
-    await client.query('begin');
+    await client.query('begin isolation level read committed');
     const goal = (await client.query<{ timezone: string; start: string; settings: number; revision: string }>(
       'select timezone, record_start_date::text as start, goal_settings_revision as settings, history_revision::text as revision from goal where id=$1 and user_id=$2 for update', [goalId,userId])).rows[0];
     if (!goal) { await client.query('rollback'); return { kind: 'not_found' } as const; }

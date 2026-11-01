@@ -4,7 +4,7 @@ Supporting Artifact / Not a Source of Truth
 
 - 対象：[Issue #319](https://github.com/FutureROI-DevTeam/Future-ROI/issues/319)
 - 基準：2026-11-01 JST、main `52364c75883315ee228060302be8585c741189c2`
-- Branch：`feat/319-goal-history`。専用worktreeのみ。push/PR/merge/deployは実行していない。
+- Branch：`feat/319-goal-history`。専用worktreeで実装。2026-11-01時点では公開なし。2026-11-02にレビュー修正後のpush・PR作成が依頼者から承認された（末尾追補）。main統合・deployは対象外。
 - 正本：[P-25](../product-spec.md#p-25-goal詳細と過去記録のローカル改善319)、[D-33](../architecture.md#d-33-過去記録の編集と履歴版319ローカル検証)
 
 ## 環境と再現
@@ -63,8 +63,8 @@ Unit/Integrationは固定例を含め617成功。Web通常実行の既存skip 1�
 
 | 対象 | 変更前 | 変更後 |
 | --- | --- | --- |
-| PC | before-desktop.png | after-desktop.png |
-| スマホ | before-mobile.png | after-mobile.png |
+| PC | [変更前](assets/issue-319/before-desktop.png) | [変更後](assets/issue-319/after-desktop.png) |
+| スマホ | [変更前](assets/issue-319/before-mobile.png) | [変更後](assets/issue-319/after-mobile.png) |
 | スマホのグラフ・編集・足跡 | — | after-mobile-chart.png / after-mobile-editor.png / after-mobile-footprint.png |
 
 ## 変更ファイル
@@ -177,3 +177,53 @@ API更新前に専用クラスタをPID・port・所有者・対象Goalで特定
 ### 残る境界
 
 Safari/iOS実機・実screen reader・実利用者受入・Node 24.22.1そのもの・本番反映は未検証。初期量の変更前後を永続監査する機能と、開始前の日別記録の取り込みは含めない。旧クライアントの履歴版移行など、前段の統合前判断は引き続き残る。push/PR/merge/deployは行っていない。
+
+## 2026-11-02：敵対的セルフレビューの修正とPR準備
+
+依頼者の「終わったらPR作成頼む」により、修正・再検証後のpushとPR作成へ進む。main統合・本番DB・deploy・大会提出物の変更は引き続き対象外。上の2026-11-01の公開状態は当時の記録である。
+
+### 再現した3件と修正
+
+| 問題 | 原因・修正 | 回帰 |
+| --- | --- | --- |
+| `?date=A`で開いてB日を編集中、正常な同owner再確認でBの入力が消える | 復元よりURLの日付を優先していた。URLは訪問時の初期値にし、その後の月・選択日・入力を復元する。URL自体が変われば別訪問として初期化 | [history-lifecycle.browser.tsx](../../apps/web/tests/history-lifecycle.browser.tsx)の実session SDK再確認・URL変更 |
+| 履歴の保存中にGoalへ戻ると、DBは更新済みでもTodayが古い累計を表示する | 成功処理がunmount時にcache更新も中止していた。cache更新はmount寿命から分離し、ownerとdraft世代を前後で検査する | 同Chrome回帰の離脱後更新・別ownerに到着する旧保存 |
+| DB既定分離レベルがREPEATABLE READだと、lock待ち中の更新を409へ変換できない | plain BEGINがpool既定へ依存していた。従来PUTと同じ明示READ COMMITTEDにし、lock後の最新履歴版をCAS検査する | [history-edit-concurrency.test.ts](../../apps/api/tests/history-edit-concurrency.test.ts)で実row lock待ち・競合・上書きなしを検査 |
+
+修正はHistoryPage・HistoryEditor・logs/storeに限定し、Prediction Engine・依存・DTO・migrationには追加変更を加えていない。新しい回帰は既存runnerに登録し、既存テストを削除・skip・弱化していない。最初の新規Chrome回帰の失敗は合成応答に契約外の`goalId`を付けたためで、実契約と同じ閉じたLog DTOに直して成功させた。
+
+### 実アプリでの再検証
+
+専用の合成アカウントとローカルAPIで、`?date=2026-11-02`から11月1日を選び777分を入力し、実session再確認後も選択日と入力が一致した。別の一時合成GoalではPATCHを保留し、保存中に実Goal/Today画面へ移動して旧累計0分を先に読み込ませた。PATCH成功後にGoal・ログ・Todayの3経路が再取得され、DBと画面が20分へ一致した。一時Goalだけをfinallyで削除した。
+
+PC 1440pxとスマホ390pxで確認し、横overflowなし。修正後の[スマホの保持入力](assets/issue-319/review-draft-mobile.png)と[PCの離脱後更新](assets/issue-319/review-save-desktop.png)を保存した。Chrome consoleには既存favicon 404のみで、操作中のJS例外は検出していない。操作ログはGit除外の`.local/319/pr-query-draft.log`・`pr-leave-save.log`に保持した。
+
+ローカルAPIは既存の保全済みDBを再開し、seed・migrationを行っていない。再起動直前の利用者Goal・日別行の新しいsnapshotと再起動後を読み取りで比較して一致した。前日のsnapshotへ戻す操作は行っていない。
+
+### 追加・更新ファイル
+
+- [apps/api/src/logs/store.ts](../../apps/api/src/logs/store.ts)
+- [apps/api/tests/history-edit-concurrency.test.ts](../../apps/api/tests/history-edit-concurrency.test.ts)
+- [apps/web/src/features/history/HistoryPage.tsx](../../apps/web/src/features/history/HistoryPage.tsx)
+- [apps/web/src/features/history/HistoryEditor.tsx](../../apps/web/src/features/history/HistoryEditor.tsx)
+- [apps/web/tests/history-lifecycle.browser.tsx](../../apps/web/tests/history-lifecycle.browser.tsx)
+- [apps/web/tests/session-cache.browser-check.mjs](../../apps/web/tests/session-cache.browser-check.mjs)
+- Product Spec P-25追補、Architecture D-33、変更対応表、本検証記録、合成データの共有用画像6枚
+
+### 最終HEADへ向けた検証
+
+| 実行 | 結果 | Git除外のローカル証跡 |
+| --- | --- | --- |
+| `node scripts/local-319/test-all.ts` | 全49 APIファイル316成功（shared 307＋milestone 9）、Prediction 77、Web 201成功。失敗0 | `.local/319/pr-test-all.log` |
+| `npm run verify:r11` | 32成功。上のUnit/Integrationと計626成功 | `.local/319/pr-r11.log` |
+| `npm run test:browser --workspace=@futureroi/web` | Chrome 23成功、失敗・skip 0 | `.local/319/pr-native-browser.log` |
+| 新規履歴回帰の最終再実行 | URLと異なる月・日付の復元、URL変更、離脱後更新、別ownerへの遅延保存の4ケース成功 | `.local/319/pr-history-lifecycle-final.log` |
+| 既存goal-feedback Chrome回帰 | 1成功、38シナリオ、320/390/768/1440px | `.local/319/pr-feedback.log` |
+| `npm run typecheck` / `npm run build` | 両方exit 0。新規API回帰も型検査対象。既存bundle 500KB警告あり | `.local/319/pr-typecheck.log` / `pr-build.log` |
+| `npm run verify:foundation` | 122 text files・2807 local links・環境例・ignore・差分空白の検査成功。アプリテストとは別 | `.local/319/pr-foundation.log` |
+
+通常Webの既存skip 1件は、上のChrome別コマンドで実行する案内。全APIファイル列挙とmilestoneの独立DBガードを維持した。新規ChromeケースではURL初期日の10月9日から9月30日へ移り、正常な同owner確認後の表示月・選択日・777の保持を追加で検査した。
+
+最終セルフレビューではreview-gateに従って、Issue全体、3件の再現条件、owner世代、設定・履歴CAS、失敗時の明示的回復、文書・画像を照合した。新たなBlockingは検出していない。人間のApproveや統合受入を代替しない。README・起動設定・環境変数・依存はこの追補で変えていないため追加更新不要とした。
+
+未検証境界はSafari/iOS実機、実screen reader、実利用者受入、ローカルNode 24.22.1、本番migration・deploy。既存の大きいbundle警告とfavicon 404、旧PUTクライアントが履歴版を省略する場合の保証範囲、長期履歴fingerprintの通信量、初期量の永続監査・開始前の日別取り込みは残る。

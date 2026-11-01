@@ -31,8 +31,10 @@ export function HistoryEditor({goal,date,log,onClose,onSaved,initial,onDraftChan
     const guard=createSavePeerGuard(base.goal.id,()=>{});guard.start();
     try{
       await requestJson(HistoryEditResult,'/api/goals/'+encodeURIComponent(base.goal.id)+'/logs/'+base.date,{method:'PATCH',body:{status,expectedGoalSettingsRevision:base.goal.goalSettingsRevision,expectedHistoryRevision:base.goal.historyRevision,...(status==='DONE'?{amount:Number(amount)}:{})}});
-      if(!alive.current || typeof base.owner!=='string' || !isDraftOwner(base.owner,base.generation))return;
+      // A confirmed write must refresh the same owner's cache even after leaving this editor.
+      if(typeof base.owner!=='string' || !isDraftOwner(base.owner,base.generation))return;
       await client.cancelQueries({queryKey:goalKeys.all});
+      if(!isDraftOwner(base.owner,base.generation))return;
       await client.invalidateQueries({queryKey:goalKeys.all});
       if(alive.current && typeof base.owner==='string' && isDraftOwner(base.owner,base.generation))onSaved();
     }catch(e){
