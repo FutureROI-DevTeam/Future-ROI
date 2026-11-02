@@ -215,9 +215,28 @@ test('#244: real form/Today at 320/390/768/1440, native input, confirmed feedbac
   await evaluate('window.__goalQA.removeAchieved()');
   await until(state, v => !v?.text?.includes('読み終えた本'), 'deleted goal remained');
   const targets = await evaluate('[...document.querySelectorAll(".fr-footprint__day")].map(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height}))');
-  assert.ok(targets.every(box => box.w >= 44 && box.h >= 44));
+  assert.ok(targets.every(box => box.w >= 44 && box.h >= 44), 'footprint target bounds: ' + JSON.stringify({ minWidth: Math.min(...targets.map(box=>box.w)), minHeight: Math.min(...targets.map(box=>box.h)) }));
   await screenshot('footprint-recovered-390');
   evidence.push({ mode: 'footprint loading/failure/retry/deleted goal/mobile targets' });
+  for (const width of [320, 390, 768, 1440]) {
+    await resize(width); await mount('list-small');
+    await until(state, v => v?.footprint?.includes('連続実施 1日'), 'calendar not ready at ' + width);
+    const calendar = await evaluate(`(()=>{
+      const card=document.querySelector('.fr-footprint'), days=card.querySelector('.fr-footprint__days');
+      return { columns:getComputedStyle(days).gridTemplateColumns.split(' ').length,
+        weekdays:card.querySelector('.fr-footprint__weekdays').textContent,
+        overflowing:[...card.querySelectorAll('*')].filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.className),
+        pageOverflow:document.documentElement.scrollWidth>innerWidth+1,
+        targets:[...card.querySelectorAll('.fr-footprint__day')].map(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height})) };
+    })()`);
+    assert.equal(calendar.columns, 7, 'calendar must have seven columns at ' + width);
+    assert.equal(calendar.weekdays, '月火水木金土日');
+    assert.deepEqual(calendar.overflowing, [], 'calendar must fit without internal horizontal scrolling at ' + width);
+    assert.equal(calendar.pageOverflow, false);
+    assert.ok(calendar.targets.every(box=>box.h>=44 && box.w>=(width>=390?44:24)), 'calendar targets must fit narrow screens at ' + width);
+    await screenshot('footprint-calendar-' + width);
+    evidence.push({mode:'seven-column month calendar without horizontal scrolling ' + width, ...calendar});
+  }
   await resize(390); await mount('today-counts');
   await click('[...document.querySelectorAll(".fr-today__dock button")].find(e=>e.textContent.trim()==="記録を変更")');
   await click('[...document.querySelectorAll(".fr-today__dock button")].find(e=>e.textContent.trim()==="量を変更")');

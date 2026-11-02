@@ -162,6 +162,12 @@ test('#319 history lifecycle: URL entry, same-owner confirmation, unmounted save
   t.diagnostic(JSON.stringify(result));
 });
 
+test('#319 footprint calendar: weekdays, leap month, focus and week/month navigation', { timeout: 180000 }, async (t) => {
+  const result = await runBrowser(t, './footprint-calendar.browser.tsx', true);
+  assert.equal(result.results.length, 4);
+  t.diagnostic(JSON.stringify(result));
+});
+
 test('#191 Today boundaries: response ordering, cancelled retry, and batched draft invalidation', { timeout: 180000 }, async (t) => {
   const result = await runBrowser(t, './session-today-boundary.browser.tsx', false, true);
   assert.equal(result.results.length, 13);

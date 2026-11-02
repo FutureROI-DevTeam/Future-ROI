@@ -957,7 +957,9 @@ D-248のGoal UUIDは既存Goal APIの大文字/小文字許可を保持し、補
 
 **Invariants / Non-goals / Consequences：** 所有権、固定記録開始日、整数分、DONE正整数、SKIPPED NULL、UNKNOWN行なし、永続unit lockを保つ。全記録を取り消してもtimezone・初期量の既存の編集制限は解除しない。Engineやg50/P50/P80は不変。公開・本番DB・モデル精度・実利用者受入は対象外。fingerprintは全履歴サイズに比例するため、長期利用の通信量が問題になればversion付き一覧DTO等を比較する。高頻度の別日編集が問題になる場合は競合粒度を再検討する。
 
-**Evidence：** [API回帰](../apps/api/tests/history-edit.test.ts)、[DB既定分離レベルとlock待ちの回帰](../apps/api/tests/history-edit-concurrency.test.ts)、[FE照合・累積回帰](../apps/web/tests/history-edit.test.mjs)、[履歴画面の寿命・所有者回帰](../apps/web/tests/history-lifecycle.browser.tsx)、既存Chrome回帰と[ローカル検証記録](changes/issue-319-goal-history.md)。テスト成功を本番採択や予測精度の証明にしない。
+全Goalの足跡も既存の`monthCells`の月曜始まり・月初paddingを保持して7列へ配置する。14列の固定最小幅とスクロール位置の副作用を廃止し、上下キーを7日に揃える。日付の集計・timezone・未確認・単位量を合算しない条件は`buildFootprint`をそのまま使う。
+
+**Evidence：** [API回帰](../apps/api/tests/history-edit.test.ts)、[DB既定分離レベルとlock待ちの回帰](../apps/api/tests/history-edit-concurrency.test.ts)、[FE照合・累積回帰](../apps/web/tests/history-edit.test.mjs)、[履歴画面の寿命・所有者回帰](../apps/web/tests/history-lifecycle.browser.tsx)、[足跡の月配置・キー回帰](../apps/web/tests/footprint-calendar.browser.tsx)、既存Chrome回帰と[ローカル検証記録](changes/issue-319-goal-history.md)。テスト成功を本番採択や予測精度の証明にしない。
 
 ### D-34 開始前の合計量の訂正（#319）
 

@@ -227,3 +227,32 @@ PC 1440pxとスマホ390pxで確認し、横overflowなし。修正後の[スマ
 最終セルフレビューではreview-gateに従って、Issue全体、3件の再現条件、owner世代、設定・履歴CAS、失敗時の明示的回復、文書・画像を照合した。新たなBlockingは検出していない。人間のApproveや統合受入を代替しない。README・起動設定・環境変数・依存はこの追補で変えていないため追加更新不要とした。
 
 未検証境界はSafari/iOS実機、実screen reader、実利用者受入、ローカルNode 24.22.1、本番migration・deploy。既存の大きいbundle警告とfavicon 404、旧PUTクライアントが履歴版を省略する場合の保証範囲、長期履歴fingerprintの通信量、初期量の永続監査・開始前の日別取り込みは残る。
+
+## 2026-11-02：一覧の足跡を7列の月カレンダーへ修正
+
+依頼者の実画面指摘「サイズによって横スクロールが入る。普通のカレンダー風に」に基づく。[P-25](../product-spec.md#p-25-goal詳細と過去記録のローカル改善319)の配置を具体化した。既存PR #320への追補で、merge・deployは対象外。
+
+**症状・原因：** 月の日数を表示していた一方、旧4週間帯の14列・min-width 642px・overflow-x auto・右端への自動スクロールが残っていた。合成アカウントで、320/390/768pxではカード内部の幅262/332/582pxに対して646pxのscrollWidthを再現した。月初の曜日paddingもfilterで落としていた。
+
+**修正：** 既存のmonthCellsの空欄を保持し、月曜始まりの曜日と7列の可変幅へ変更した。月は一か所に示し、前後矢印・今月へ戻る・日付選択と今日の強調を残す。上下キーは±7日、左右は±1日とし、月境界でも選択日とfocusを合わせる。初月／最新月の外へは移動しない。集計・未記録／休み／未確認／開始前／未来の判定、単位を合算しない条件、API・DB・Engine・依存は変更していない。
+
+**再検証：** 実Chrome＋既存の検証用DBで320/390/768/1440pxの7列とページ・カード内部の横overflowなしを確認した。390pxで実touch入力によるDONEの日のGoal導線・未来日の表示・今日の選択も確認。スクロールバーを表示する390pxの既存回帰では、列間を1pxに調整し44px以上の操作対象を維持した。320pxでは列幅を約36px・高さ48pxに収める。
+
+| 検証 | 結果 | Git除外の証跡 |
+| --- | --- | --- |
+| Web Unit | 201成功、失敗0。既存のブラウザ別実行案内skip 1 | `.local/319/footprint-calendar/web-unit-verified.log` |
+| 既存Chrome回帰＋追加カレンダー回帰 | 24成功、失敗・skip 0。追加4ケースは30/31日・月曜／木曜／金曜／日曜開始、閏年2月、月境界、前後の週、Home/Endとfocusを検査。最終CSSでも追加ケースを再実行 | `.local/319/footprint-calendar/native-all.log`・`native-target-final.log` |
+| 保存差分・レスポンシブ回帰 | 1成功、42シナリオ。4幅の7列・内部overflow・操作寸法の検査を追加し、既存44px条件を維持 | `.local/319/footprint-calendar/feedback-final.log` |
+| 全workspace typecheck / build | 両方exit 0。既存bundle警告あり | `.local/319/footprint-calendar/typecheck-all.log`・`build.log` |
+| 実アプリの配置・touch | 上記4幅、前後月、上下キー、touchの日付選択成功。Goal・記録への書込なし | `.local/319/footprint-calendar/after-final.log`・`touch.log` |
+| Foundation | 122 text files・2819 local links・環境例・ignore・差分空白の検査成功 | `.local/319/footprint-calendar/foundation.log` |
+
+最初の追加Chrome回帰はhook用runnerがCSSを出力しないため失敗し、entryへ本番CSSを明示的に組み込んで修正した。初回typecheckのButtonへ任意classNameを渡した誤りは、既存の部品契約に合わせたwrapperで修正した。初回Web Unitのloopback拒否は通常権限で再実行し、並列ブラウザ負荷中に発生した既存起動deadlineテストの時間依存失敗は、他のブラウザ検証終了後に同じWebコマンドを単独再実行して成功した。既存テストの削除・skip・assertion緩和や起動helperの変更は行っていない。
+
+変更ファイルはGoalFootprint.tsx・goals.css、追加[カレンダー回帰](../../apps/web/tests/footprint-calendar.browser.tsx)と既存browser runner・goal-feedback回帰、P-25・D-33・変更対応表・本記録と画像。review-gateで既存集計、境界・focus、表示寸法と文書を確認し、追加Blockingは検出していない。README・起動方法・環境変数・API契約はこの追補で変わらず追加更新不要。Safari/iOS実機・実screen reader・人間の受入は未検証。
+
+| 幅 | Before | After |
+| --- | --- | --- |
+| スマホ390px | [修正前](assets/issue-319/footprint-before-390.png) | [修正後](assets/issue-319/footprint-after-390.png) |
+| 中間幅768px | [修正前](assets/issue-319/footprint-before-768.png) | [修正後](assets/issue-319/footprint-after-768.png) |
+| PC 1440px | — | [修正後](assets/issue-319/footprint-after-1440.png) |
