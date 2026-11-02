@@ -1,7 +1,7 @@
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { PASSWORD_RESET_UNAVAILABLE_MESSAGE } from './password-reset-policy.ts';
 
-// 1.7.7のsignOutは削除例外（削除前lookupの例外も）を捕捉してCookieを消す。
+// Better AuthのsignOutは削除例外（削除前lookupの例外も）を捕捉してCookieを消す。
 // HTTP routerのOrigin/CSRF検査後、SDK署名で確かめたtokenだけを先に削除する。
 // 現設定はDB sessionのみ（secondary storage・session delete hooksなし）。追加時はこの境界を再検討する。
 export const createAuthBeforeHook = (passwordResetEnabled: boolean) => createAuthMiddleware(async (ctx) => {
@@ -14,7 +14,7 @@ export const createAuthBeforeHook = (passwordResetEnabled: boolean) => createAut
   const token = await ctx.getSignedCookie(ctx.context.authCookies.sessionToken.name, ctx.context.secret);
   if (!token) return; // 未ログイン・不正署名のCookie処理はSDKに委ねる。
   try {
-    // internalAdapter.deleteSessionの読み取り失敗によるno-opを避ける。
+    // SDK内部の削除前lookupや例外処理に依存せず、削除結果を直接確認する。
     // tokenはunique。0行でも既に失効済みとして明示再試行を成功にできる。
     await ctx.context.adapter.delete({ model: 'session', where: [{ field: 'token', value: token }] });
   } catch {

@@ -150,7 +150,7 @@ Evidenceは[Compose検証](../scripts/smoke-compose.sh)と[Application CI](../.g
 
 | 決める部分 | 採用 | 理由 | 比較していないもの |
 | --- | --- | --- | --- |
-| 認証テーブル | 固定版Better Auth 1.7.7（lockfile）の`getMigrations`を`db:migrate:auth`から呼ぶ。`user`・`session`・`account`・`verification`と、回数制限のDB保存用`rateLimit` | CLIの`@latest`取得を避け、実行時の設定（[authSchemaOptions](../apps/api/src/auth/options.ts)）と同じ定義からテーブルを作る（#84 F-9） | Better Auth自体の最終採択（D-24）は別。2回目以降の実行で`rateLimit.lastRequest`の型警告（期待number／実際int8）が出るが差分は作られない |
+| 認証テーブル | 固定版Better Auth 1.7.15（lockfile）の`getMigrations`を`db:migrate:auth`から呼ぶ。`user`・`session`・`account`・`verification`と、回数制限のDB保存用`rateLimit` | CLIの`@latest`取得を避け、実行時の設定（[authSchemaOptions](../apps/api/src/auth/options.ts)）と同じ定義からテーブルを作る（#84 F-9） | Better Auth自体の最終採択（D-24）は別。2回目以降の実行で`rateLimit.lastRequest`の型警告（期待number／実際int8）が出るが差分は作られない |
 | アプリテーブル | `apps/api/migrations/NNNN_name.sql`を名前順に、1ファイル1トランザクションで適用する小さなrunner（[migrate.ts](../apps/api/src/db/migrate.ts)）。`schema_migrations`に名前とSHA-256を記録し、適用済みファイルの変更は失敗にする。advisory lockで同時実行を直列化 | `goal`・`action_log`の2表にSQLを直接書けば足り、新しい依存を増やさない。CI・本番で`@latest`を取得しない | `node-pg-migrate`等のツールは不採用（必要になった時点で再検討） |
 | 実行順 | `db:migrate` ＝ `db:migrate:auth` → `db:migrate:app`。[`db:seed:demo`](operations/demo-seed.md)は認証作成済みuserIdへ明示実行 | `goal.user_id`が`"user"(id)`を参照するため。自動Seedで既存データをresetしない | — |
 | `updated_at` | 両表のBEFORE UPDATE triggerでDBが進める | 上書きの有無を追う列を、アプリの書き忘れで止めない | — |
@@ -168,7 +168,7 @@ Evidenceは[Compose検証](../scripts/smoke-compose.sh)と[Application CI](../.g
 
 | 決める部分 | 採用 | 理由 |
 | --- | --- | --- |
-| ライブラリと版 | Better Auth 1.7.7（#74で固定）。メール＋パスワード、DBセッション、同一originのCookie、`/api/auth/*` | #84・#96で登録〜ログアウト・回数制限・Cookie属性・Linuxコンテナを実測した版。自作よりパスワード・セッションの保守責任が小さい |
+| ライブラリと版 | Better Auth 1.7.15（#322で1.7.7から更新）。メール＋パスワード、DBセッション、同一originのCookie、`/api/auth/*` | #84・#96の実測は1.7.7。現行版の更新・検証は[#322](https://github.com/FutureROI-DevTeam/Future-ROI/issues/322)で追跡する。自作よりパスワード・セッションの保守責任が小さい |
 | Fastifyとの接続 | [bridge.ts](../apps/api/src/auth/bridge.ts)。URLは`BETTER_AUTH_URL`から組み立て、client IPはFastifyの`trustProxy`判定の結果だけを専用headerで渡し、複数のSet-Cookieをそのまま転送する | 公式ガイドの形では、Host偽装・X-Forwarded-For偽装による回数制限の回避と、sign-outのCookie消去漏れが起きうる（#84 F-5〜F-7） |
 | 保護の既定 | [guards.ts](../apps/api/src/http/guards.ts)はrouterの確定routeで判定する。登録済み`/api/health`・`/api/auth/*`以外の業務APIはセッション必須（route未定義のAPI pathも401）。業務APIの状態変更（GET／HEAD／OPTIONS以外）は許可originのOriginヘッダーが必須（違反は403 `ORIGIN_REJECTED`） | 追加し忘れで公開されるAPIを作らない。`SameSite=Lax`だけでは同一siteの別originを防げない（#84 F-8）。認証endpointは固定版Better Authの`trustedOrigins`・Referer／Fetch Metadata検査に委ね、業務APIの「Originなしは403」とは異なる。#76・#77はこのhookの内側に置く |
 | session更新とlogout故障 | 保護APIでgetSessionが返す複数のSet-Cookieを転送し、DB expiry延長とCookie更新を揃える。画面は通信例外・API errorを表示しbusyをfinallyで解除、logout error時は遷移しない。#215で[削除確認hook](../apps/api/src/auth/sign-out.ts)を追加する（[失敗契約](#ログアウトの失敗と明示再試行215)） | Cookie消去前に署名tokenのDB削除完了を待つ。失敗・結果不明は503 `SIGN_OUT_UNCONFIRMED`、Cookie保持、明示再試行。503時の旧Cookie失効は保証しない。公開HTTPS・復旧担当等のD-24残条件は維持 |
@@ -176,6 +176,8 @@ Evidenceは[Compose検証](../scripts/smoke-compose.sh)と[Application CI](../.g
 | 回数制限 | DB保存（`rateLimit`表）。1 IPあたり60秒にsign-in／sign-up各5回（`AUTH_SIGN_IN_MAX`／`AUTH_SIGN_UP_MAX`で上書き）、その他の認証endpointは100回。429の`X-Retry-After`は整数秒で、画面は残り秒数を数えて表示し、経過後に再試行できる | 再起動・複数instance・並列要求をまたいで効く（#84で実測）。現行アプリの[並列受入回帰](../apps/api/tests/auth-concurrency.test.ts)（#142）で、2instance・IP/endpoint隔離・拒否時のDB不変・再起動・期限切れ窓からの並列再開を確認する。共有回線のデモ会場向けの上限は未合意のため環境変数で変えられる |
 | Secret・URL | `BETTER_AUTH_SECRET`（本番必須、32文字以上。開発では`apps/api/.local/auth-secret`に自動生成）、`BETTER_AUTH_URL`（本番必須）、`AUTH_TRUSTED_ORIGINS`（任意）、`TRUST_PROXY_HOPS`（既定0）。パスワード再設定メールの`MAIL_TRANSPORT`／`RESEND_API_KEY`／`MAIL_FROM`は[#256](#パスワード再設定256) | 実値をGitへ入れず、開発者ごとの生成を手順から外す。proxyのhop数は公開先の実形式で確認する（#83） |
 | 画面 | `/`は公開トップ（P-16）。`/login`・`/register`は[AuthPage](../apps/web/src/routes/AuthPage.tsx)。[router](../apps/web/src/router.tsx)はURLに現れない2つのまとまり（pathless layout route）で分ける：認証画面はログイン済みなら戻り先へ移り、Goalの5つの保護route（一覧・作成・Today・編集・履歴）はログインの確認を1か所で行う（未ログインは元のURLを戻り先にログインへ、確認できない通信失敗はログインへ送らず「接続できませんでした」）。ログイン後・ログアウト後は履歴を置き換える。戻り先はアプリ内pathだけ。ログアウトはmobileではGoal一覧、desktopでは全5保護routeで共有するAppShellのアカウントメニューから行う。セッション切れ（401）は理由付き（`reason=expired`）で再ログインへ誘導。404・エラー・読込中はルーター全体の既定の画面。Goalの記録の履歴は`/goals/$goalId/history`（カレンダー）。デスクトップ幅ではログイン必須の画面の外側（AppShell）に画面全体の上のバーを出す。上のバーは1段にし、Goalの作成・編集と記録の履歴では画面ごとの上のバーの代わりに戻り先と見出し（[DeskHeader](../apps/web/src/ui/components/DeskHeader.tsx)）を出す（#146） | R-01の画面要件。Goal・記録の画面は#78〜#81、デザインに合わせた画面とルート構成は#146 |
+
+2026-11-03、[#322](https://github.com/FutureROI-DevTeam/Future-ROI/issues/322)でAPI・Webを公開済みの1.7.15へ先行更新する。[公式予告](https://better-auth.com/blog/security-release-2026-11-03)の11月3日公開分の修正版・GHSAは確認時点で未掲載のため、この更新だけで同公開分の対策完了とは扱わない。公開後の影響判定・必要な追加措置・対象版と検証結果は同Issueで追跡する。既存の認証方式・再設定停止・D-24の残条件は変えない。
 
 #### パスワード再設定（#256）
 
@@ -188,7 +190,7 @@ Evidenceは[Compose検証](../scripts/smoke-compose.sh)と[Application CI](../.g
 
 停止回帰は[password-reset-disabled.test.ts](../apps/api/tests/password-reset-disabled.test.ts)（実SDKの既発行token、全HTTP/直SDK経路、URL/method違い、検索/発行/消費なし、account/session/token不変、logなし、通常パスワード変更）と[実ルーター回帰](../apps/web/tests/routes.browser.tsx)で追跡する。本番への反映・実配送の受入はこのコード変更/ローカル検証の完了とは区別する。
 
-以下は#256の導入設計と、**合成テストで明示有効化した場合だけ**維持する再開用の契約であり、現在の公開機能ではない。固定版Better Auth 1.7.7はトークン生成・`verification`表への保存（1時間）・再設定URLの組み立てと、`/reset-password`での新パスワード保存を持つが、メール送信は`emailAndPassword.sendResetPassword`へ渡した関数が担う。callbackを外すだけでは既発行tokenの保存は止まらないため、上記のhookも必要。SDKには文面もテンプレートも無い。
+以下は#256の導入設計と、**合成テストで明示有効化した場合だけ**維持する再開用の契約であり、現在の公開機能ではない。固定版Better Auth 1.7.15はトークン生成・`verification`表への保存（1時間）・再設定URLの組み立てと、`/reset-password`での新パスワード保存を持つが、メール送信は`emailAndPassword.sendResetPassword`へ渡した関数が担う。callbackを外すだけでは既発行tokenの保存は止まらないため、上記のhookも必要。SDKには文面もテンプレートも無い。
 
 | 決める部分 | 採用 | 理由 |
 | --- | --- | --- |
@@ -196,7 +198,7 @@ Evidenceは[Compose検証](../scripts/smoke-compose.sh)と[Application CI](../.g
 | 送信手段 | [mailer.ts](../apps/api/src/auth/mailer.ts)。本番はResendのHTTP API（SDKを増やさずfetch 1本、10秒timeout）。`MAIL_TRANSPORT=log`は送らずpino互換JSONで本文を標準出力へ出す。選択は[mail-transport.ts](../apps/api/src/auth/mail-transport.ts) | 2026-10-12のチーム決定でResendを採用。Compose・smoke・開発は外部送信も資格情報も不要にする。Resendの応答本文は宛先を含み得るため例外・ログに入れない |
 | 設定 | `MAIL_TRANSPORT`（既定: 本番resend／他log）、`RESEND_API_KEY`、`MAIL_FROM`、`AUTH_RESET_MAX`（既定5）。本番でキー・送信元が無い、または送信元の形式が不正なら起動時に拒否（[config.ts](../apps/api/src/config.ts)）。常駐server・Vercel entry・container-startで同じ検査。送信元ドメインがResendで認証済みかは起動時に検査できず、未認証なら送信時にResendが拒否する | 送れない本番を配信してから気付かない設定ミスを減らす。ドメイン認証と一般宛先への配信成功は別の受入。Secretの実値はエラーへ出さない |
 | 送信の時機と失敗 | `advanced.backgroundTasks.handler`へ[background.ts](../apps/api/src/auth/background.ts)の受け皿を渡し、SDKの`runInBackgroundOrAwait`が送信を応答から切り離す。常駐serverは預かった送信を終了時に待ってからDB接続を返し、Vercelは`@vercel/functions`の`waitUntil`でFunctionを送信完了まで生かす。例外はSDKが自身のloggerへERRORを出し、応答は200のまま | 未登録の分岐は送信が無いため、送信（Resend、最大10秒）を待つと登録済みだけ遅くなり、応答時間から登録の有無を推測できる。単に待たないだけではVercelで送信が途中で切れるため、実行環境ごとの受け皿で完了を保証する。送信失敗はサーバーログで検知する（監視は未整備） |
-| セッション | 再設定の成功時に`revokeSessionsOnPasswordReset`でその利用者の既存セッションをすべて削除する（1.7.7の既定はfalse） | 不正利用からの復旧で、旧パスワードでログインしていた端末の操作を残さない |
+| セッション | 再設定の成功時に`revokeSessionsOnPasswordReset`でその利用者の既存セッションをすべて削除する（SDKの既定に依存せず明示する） | 不正利用からの復旧で、旧パスワードでログインしていた端末の操作を残さない |
 | トークンとログ | 再設定URL（パスの`/reset-password/<token>`、`?token=`）は有効期間中それだけでパスワードを変えられる秘密として扱う。要求ログのURLは[log-url.ts](../apps/api/src/http/log-url.ts)で置き換えてから出す（Fastify既定のreq serializerと同じ項目）。`MAIL_TRANSPORT=log`は本文（URL）をログへ出すため、隔離したローカル確認だけに使う | ログを読める人へ有効なbearer tokenを渡さない。公開先（Vercel等）のアクセスログは別途確認が要る |
 | 回数制限 | `/request-password-reset`・`/reset-password`を1 IPあたり60秒に`AUTH_RESET_MAX`回。他endpointと同じDB保存 | 大量のメール要求でResendの枠を消費させない |
 | 画面 | ログイン画面の「パスワードを忘れた方」→[ForgotPasswordPage](../apps/web/src/routes/ForgotPasswordPage.tsx)（`/forgot-password`）→メールのURL（`/api/auth/reset-password/<token>?callbackURL=<origin>/reset-password`）→[ResetPasswordPage](../apps/web/src/routes/ResetPasswordPage.tsx)（`/reset-password?token=`／`?error=INVALID_TOKEN`）。判定は[reset.ts](../apps/web/src/auth/reset.ts)。`/forgot-password`と`/reset-password`は「ログイン済みなら戻り先へ移す」[auth]の外に置き、ログイン中のブラウザでリンクを開いてもフォームを出し、無効・期限切れ・使用済みリンクからの再要求も受け付ける。要求後は登録の有無を区別せず「メールを送りました」、無効・期限切れ・使用済みは「このリンクは使えません」から再要求へ。保存後は自動ログインせずログインへ | 既存の認証画面（検査・429の待ち・エラー表示）の形に合わせる。戻り先は今開いているoriginの絶対URLにして、開発時のVite（5173）でも`trustedOrigins`の検査を通す |
@@ -205,7 +207,7 @@ Evidence: [API回帰](../apps/api/tests/password-reset.test.ts)（要求→メ�
 
 #### ログアウトの失敗と明示再試行（#215）
 
-目的はログアウト失敗を成功として表示せず、DB復帰後に本人が再試行できること。固定SDK 1.7.7のsign-outはDELETE例外を捕捉してCookieを消去し200を返す。内部の`deleteSession`は削除前lookup例外でもDELETEを飛ばすため、内部関数の正常終了だけでは削除確認にならない。[createAuthBeforeHook](../apps/api/src/auth/sign-out.ts)のsign-out分岐を`createAuth`のbefore hookへ登録し、HTTP routerの既存Origin/Referer/Fetch Metadata・callbackURL検査後、SDKの`getSignedCookie`で確かめたtokenだけをDB adapterで削除する。既存SDK endpointがCookie消去と200応答を担当し、正常経路では追加のDELETEを行わない。未ログイン・不正署名はSDKの従来処理に委ね、他sessionは削除しない。
+目的はログアウト失敗を成功として表示せず、DB復帰後に本人が再試行できること。導入時のSDK 1.7.7はsign-outでDELETE例外を捕捉してCookieを消去し200を返し、内部の`deleteSession`は削除前lookup例外でもDELETEを飛ばした。現行版もsign-outが削除例外を捕捉するため、SDKの正常応答だけでは削除確認にしない。[createAuthBeforeHook](../apps/api/src/auth/sign-out.ts)のsign-out分岐を`createAuth`のbefore hookへ登録し、HTTP routerの既存Origin/Referer/Fetch Metadata・callbackURL検査後、SDKの`getSignedCookie`で確かめたtokenだけをDB adapterで削除する。既存SDK endpointがCookie消去と200応答を担当し、正常経路では追加のDELETEを行わない。未ログイン・不正署名はSDKの従来処理に委ね、他sessionは削除しない。
 
 削除完了が確認できないときは503 `SIGN_OUT_UNCONFIRMED`を返し、Cookieを消去しない。画面は「ログアウトを確認できませんでした」と再試行の案内を表示し、busyを解除してその場に留まる。自動再試行は行わない。DB復帰後に再びログアウトを押し、削除完了→Cookie消去→ログイン画面へ進む。DELETE応答が失われた場合は削除済みでも503とし、次の0行DELETEを成功として収束できる。HTTP応答は共通のno-storeを維持する。
 
@@ -223,7 +225,7 @@ Evidence: [合成DB回帰](../apps/api/tests/sign-out-failure.test.ts)は実crea
 - 送信と確定結果: 保存中の旧mutationはowner/画面別のkeyで追い、再確認後に同じ送信の新フォームを開かない。mutation/callback・結果不明の作成attemptはdraftとして復元しない。成功応答は送信時owner・draft連続性世代・ページの訪問トークンに束縛して親へ伝え、正常同一owner確認後に一覧へ一度だけ移す。異なるpathへの遷移開始で訪問トークンを失効させ、同routeのGoal1→Goal2→Goal1やcommit前の離脱・復帰でも旧成功を採用しない。同path/searchの確認は同じ訪問を保つ。確定成功後に空フォームを開かない。実ページ離脱・owner変更・失敗後は旧成功を新画面へ作用させない。実route/Goal離脱ではメモリを破棄する。未ログインが確定した場合は読み込みを続けず既存の再ログイン案内を表示する。
 - 他の責務: HTTP保存禁止（#153）、API所有者認可、作成結果不明の回復契約（#148）、direct GETの#175は別責務で、API/回復処理本体はこの修正では変更しない。getPrivateEpochはatomで確認が始まった直後から閉じ、非query回復GETが旧epochを再利用しない。
 - #148との確定成功の接続: 確認中にフォームが一時unmountされても、親が同owner・連続性・訪問の成功を採用するときは、送信時の作成操作を終了してから一覧へ移す。owner/key/保存原文が一致しなければK2を残し、その回復フォームへ戻す。読取・削除例外は原文を残して確認案内を出し、新規入力や自動再送を始めない。実離脱・owner変更後の旧成功はこの終了処理を呼ばない。作成mutationの待機はowner・訪問別とする。同じ訪問の確認中は待ち、別訪問で明示再送が確認済みなら、保留中の元応答で次の作成を待たせない。未確定attemptはowner別に復元する。
-- 検証と限界: [実hook／DOM回帰](../apps/web/tests/session-cache.browser-check.mjs)は制御したsession・応答で画面とQueryClientを動かす。固定版Better Auth 1.7.7はwindow focus自体ではなく可視復帰を購読し、onlineも同じ自動確認の5秒抑制を使う。routeの明示確認は抑制対象外で、既定の定期pollは0。再取得中は旧dataが残りisPending=falseでもisRefetching=trueとなり、503・429・通信例外では直前のdataを保持してerrorを設定する。[固定版client回帰](../apps/web/tests/session-focus.browser.tsx)は実useSessionとvisibilitychange、合成HTTPで確認中の外国応答・失敗・同一owner回復を確認し、[ルート確認回帰](../apps/web/tests/session-confirm.test.mjs)は確認の置換・並行呼出し・未ログイン・429を検証する。[draft回帰](../apps/web/tests/session-draft.browser.tsx)は15操作、短い中間owner/error・確認中の外国応答・保存中mutation・明示保存と編集revisionを確認する。専用合成DB・実API・実ルーターの実認証・#175併用検証はPRの対象HEADと結果を参照する。別タブ通知、瞬間の実描画、公開環境・実User・共有回線のrate制限受入はこの実装だけでは保証しない。通知のない直接Cookie置換を、有効なsession ownerの認識済み切替と同一視しない。DTOにresponse ownerは含まれず、owner付きquery keyだけでもCookieと応答の所有者を証明できない。
+- 検証と限界: [実hook／DOM回帰](../apps/web/tests/session-cache.browser-check.mjs)は制御したsession・応答で画面とQueryClientを動かす。固定版Better Auth 1.7.15はwindow focus自体ではなく可視復帰を購読し、onlineも同じ自動確認の5秒抑制を使う。routeの明示確認は抑制対象外で、既定の定期pollは0。再取得中は旧dataが残りisPending=falseでもisRefetching=trueとなり、503・429・通信例外では直前のdataを保持してerrorを設定する。[固定版client回帰](../apps/web/tests/session-focus.browser.tsx)は実useSessionとvisibilitychange、合成HTTPで確認中の外国応答・失敗・同一owner回復を確認し、[ルート確認回帰](../apps/web/tests/session-confirm.test.mjs)は確認の置換・並行呼出し・未ログイン・429を検証する。[draft回帰](../apps/web/tests/session-draft.browser.tsx)は15操作、短い中間owner/error・確認中の外国応答・保存中mutation・明示保存と編集revisionを確認する。専用合成DB・実API・実ルーターの実認証・#175併用検証はPRの対象HEADと結果を参照する。別タブ通知、瞬間の実描画、公開環境・実User・共有回線のrate制限受入はこの実装だけでは保証しない。通知のない直接Cookie置換を、有効なsession ownerの認識済み切替と同一視しない。DTOにresponse ownerは含まれず、owner付きquery keyだけでもCookieと応答の所有者を証明できない。
 
 appLayoutのroute確認でもquery世代を進め、goalKeys.allをcancel→resetする。inactive queryは空の状態へ戻し、実行中の画面や次のmountで再取得するため、Today/履歴の共通keyは遷移をまたいだ取得回避を現状保証しない。確認中の旧session dataや同一session idだけではCookieと業務応答のownerを確定できないため、このPRでは全resetを維持する。公開先の体感遅延・通信量のチーム受入は未承認。局所的な遷移測定はPR記録に残し、公開環境の性能保証へ読み替えず、大規模cache再設計は別判断とする。
 
@@ -344,7 +346,7 @@ PATCHはREAD COMMITTEDを明示し、Goal行だけをFOR UPDATEで取得して�
 ## Data Model
 
 ```sql
--- 認証テーブル（"user"・session・account・verification・rateLimit）は固定版Better Auth 1.7.7のgetMigrationsで作る（#74、db:migrate:auth）
+-- 認証テーブル（"user"・session・account・verification・rateLimit）は固定版Better Auth 1.7.15のgetMigrationsで作る（#74、db:migrate:auth）
 CREATE TABLE goal (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
