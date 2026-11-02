@@ -153,7 +153,7 @@ test('session ownership: real React hooks/Goal screens reject old cache and draf
   t.diagnostic(JSON.stringify(result));
 });
 
-test('Better Auth 1.7.7: visibility refetch failure masks draft and successful recovery starts a fresh form', { timeout: 180000 }, async (t) => {
+test('Better Auth: visibility refetch failure masks draft and successful recovery starts a fresh form', { timeout: 180000 }, async (t) => {
   const result = await runBrowser(t, './session-focus.browser.tsx', false);
   assert.equal(result.results.length, 4);
   assert.equal(result.writes, 0);

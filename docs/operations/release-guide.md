@@ -284,7 +284,7 @@ Invoke-ReleaseDbCommand check
 Invoke-ReleaseDbCommand migrate
 ```
 
-これは既存の `npm run db:migrate` を呼び、**認証 → アプリ**の順に実行します。認証は固定Better Auth 1.7.7のschemaから、アプリは [migrations](../../apps/api/migrations/) の名前順・1ファイル1transactionで適用し、`schema_migrations`へ名前とSHA-256を記録します。2つの0005や番号の飛びを理由に改名しません。Vercel entry／buildではmigrationを行わないので、この別実行を省略しません。[runner](../../apps/api/src/db/migrate.ts)
+これは既存の `npm run db:migrate` を呼び、**認証 → アプリ**の順に実行します。認証は[固定版Better Authのschema](../architecture.md#2026-10-06のmigration方式74)から、アプリは [migrations](../../apps/api/migrations/) の名前順・1ファイル1transactionで適用し、`schema_migrations`へ名前とSHA-256を記録します。2つの0005や番号の飛びを理由に改名しません。Vercel entry／buildではmigrationを行わないので、この別実行を省略しません。[runner](../../apps/api/src/db/migrate.ts)
 
 **成功の確かめ方：** exit 0、結果JSONの `target: all`、`auth.tablesCreated`／`columnsAdded`、`app.applied`が予定差分と一致。**停止条件：** 非0、checksum不一致、想定外のDDL、長時間のlock待ち。接続は5秒上限ですがmigrationのlock／DDLにはHTTPの5秒上限を使わず無期限待ちになり得ます。担当者が承認した最大待ち時間で中止し、原因と適用履歴を確認します。無条件の再実行や他processの強制終了はしません。
 

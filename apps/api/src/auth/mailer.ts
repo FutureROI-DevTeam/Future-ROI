@@ -1,4 +1,4 @@
-// 認証メール（パスワード再設定）の送信手段。Better Auth 1.7.7はトークン生成と再設定URLの組み立てだけを行い、
+// 認証メール（パスワード再設定）の送信手段。Better Authはトークン生成と再設定URLの組み立てを行い、
 // 送信は`sendResetPassword`へ渡したこの関数が担う。文面は[reset-mail.ts](./reset-mail.ts)で組み立てる。
 // 本番はResendのHTTP API（SDKは入れず、fetch 1本で済ませる）。開発・Compose・smoke testは外部へ送らずログへ出す。
 
