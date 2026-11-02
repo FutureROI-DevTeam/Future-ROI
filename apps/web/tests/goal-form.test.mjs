@@ -48,11 +48,11 @@ test('API契約と同じ範囲を、送る前に項目ごとに検査する', ()
   assert.equal(validate({ ...valid, initialProgress: '0' }).initialProgress, undefined);
 });
 
-test('記録があるGoalでは、変更できない2項目を検査も送信もしない', () => {
+test('記録後はtimezoneだけを固定し、開始前の合計は検査して訂正する', () => {
   const locked = { ...valid, initialProgress: 'x', timezone: '' };
-  assert.deepEqual(validate(locked, { locked: true }), {});
+  assert.deepEqual(validate(locked, { locked: true }), { initialProgress: e.nonNegativeInteger });
   const patch = toPatchBody({ ...valuesFromGoal(goal), title: '新しい名前', initialProgress: '999', timezone: 'UTC' }, { ...goal, hasLogs: true });
-  assert.deepEqual(patch, { expectedGoalSettingsRevision: 0, title: '新しい名前' });
+  assert.deepEqual(patch, { expectedGoalSettingsRevision: 0, title: '新しい名前', initialProgress: 999 });
 });
 
 test('作成は全項目を整数で送り、編集は変えた項目だけを送る（変更がなければ送らない）', () => {
@@ -309,4 +309,18 @@ test('初期質問は2問ともどれかを選ぶまで保存させず、「回�
   assert.equal(priorChoiceError({ a: false, b: false }, true), undefined);
   // 「回答しない」を選んだ2問は、従来どおり null として送る
   assert.deepEqual(toCreateBody(valid).questionPrior, { a: null, b: null });
+});
+
+test('開始前合計は取消後も絶対値で訂正でき、409後は入力と最新設定版を使う', () => {
+  const baseline = { ...goal, hasLogs: false, historyRevision: '17', unitLocked: true, initialProgress: 600, goalSettingsRevision: 7 };
+  const values = { ...valuesFromGoal(baseline), initialProgress: '0', timezone: 'UTC' };
+  assert.equal(validate(values, { locked: true, goal: baseline }).initialProgress, undefined);
+  assert.deepEqual(toPatchBody(values, baseline), { expectedGoalSettingsRevision: 7, initialProgress: 0 });
+  assert.equal(toPatchBody(valuesFromGoal(baseline), baseline), null);
+  assert.equal(validate({ ...values, initialProgress: '-1' }, { locked: true }).initialProgress, e.nonNegativeInteger);
+  const edited = { ...valuesFromGoal(baseline), initialProgress: '@hm:["11","40"]' };
+  const latest = { ...baseline, initialProgress: 800, goalSettingsRevision: 8 };
+  const rebased = rebaseValues(edited, baseline, latest);
+  assert.equal(rebased.initialProgress, edited.initialProgress);
+  assert.deepEqual(toPatchBody(rebased, latest), { expectedGoalSettingsRevision: 8, initialProgress: 700 });
 });

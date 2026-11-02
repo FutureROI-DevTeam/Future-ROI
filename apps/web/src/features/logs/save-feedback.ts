@@ -43,6 +43,10 @@ export function confirmedSaveFeedback(before: FeedbackSnapshot, after: FeedbackS
   if (otherLogs(before.logs, saved.localDate) !== otherLogs(after.logs, saved.localDate)) {
     return null;
   }
+  if (before.goal.historyRevision !== undefined || after.goal.historyRevision !== undefined) {
+    if (before.goal.historyRevision === undefined || after.goal.historyRevision === undefined
+      || BigInt(after.goal.historyRevision) !== BigInt(before.goal.historyRevision) + 1n) return null;
+  }
   const amount = logValue(saved) - logValue(before.logs.find(l => l.localDate === saved.localDate));
   if (after.today.prediction.progress.done - before.today.prediction.progress.done !== amount) {
     return null;

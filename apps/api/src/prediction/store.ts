@@ -25,7 +25,7 @@ export async function loadTodaySnapshot(
     await client.query('begin isolation level repeatable read read only');
     const goal = (
       await client.query<SnapshotGoalRow>(
-        'select total_required, initial_progress, session_amount, timezone, record_start_date::text as record_start_date, unit, goal_settings_revision, unit_history_locked, question_prior, answer_revision::text as answer_revision, question_prior_snapshot from goal where id = $1 and user_id = $2',
+        'select total_required, initial_progress, session_amount, timezone, record_start_date::text as record_start_date, unit, goal_settings_revision, history_revision::text as history_revision, unit_history_locked, question_prior, answer_revision::text as answer_revision, question_prior_snapshot from goal where id = $1 and user_id = $2',
         [goalId, userId],
       )
     ).rows[0];

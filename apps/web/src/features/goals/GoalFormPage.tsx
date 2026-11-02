@@ -17,6 +17,7 @@ import { isNotFound, isUnauthenticated } from '../../api/http.ts';
 import { getPrivateEpoch, privateDataReady, usePrivateEpoch } from '../../api/session-cache.ts';
 import { useMemoryDraft } from '../../api/session-draft.ts';
 import { goalsCopy } from '../../copy/goals.ts';
+import { amountFormat } from '../../copy/amount.ts';
 import { GoalFormFields } from './form/GoalFormFields.tsx';
 import {
   CloseLink,
@@ -63,6 +64,7 @@ import {
   reloadLatestGoal,
   toCreateBody,
   toPatchBody,
+  parseGoalAmount,
   validateGoalForm,
   valuesFromGoal,
   valuesFromCreateBody,
@@ -250,7 +252,7 @@ function GoalForm({
 }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const locked = mode === 'edit' && goal.hasLogs;
+  const locked = mode === 'edit' && (goal.hasLogs || Number(goal.historyRevision ?? 0) > 0);
   const title = mode === 'create' ? f.createTitle : f.editTitle;
   // 回復情報は過去の送信結果が不明な証跡。最初の描画で1回だけ読む
   const [recovery] = useState(() => loadRecovery(owner, failure));
@@ -270,6 +272,7 @@ function GoalForm({
   const [submitted, setSubmitted] = useState(restored?.submitted ?? false);
   const [serverErrors, setServerErrors] = useState<FieldErrors>(recoveredFailure?.serverErrors ?? {});
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [initialConfirmation, setInitialConfirmation] = useState<FormValues | null>(null);
   // APIの422で見つかったエラー項目。送信中は入力欄が押せないため、送信が終わってからフォーカスを移す
   const [focusAfterSave, setFocusAfterSave] = useState<FieldErrors | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -359,7 +362,7 @@ function GoalForm({
         }
         return goalsHttp.createGoal(operation.body, operation.key, operation.owner);
       }
-      // 記録の有無は最新の Goal に従う（記録が付いた後は timezone・initialProgress を送らない）
+      // 記録後のtimezoneは送らず、開始前の累計は確認した絶対値と設定版で訂正する。
       const patch = toPatchBody(v, { ...baseline!, hasLogs: goal.hasLogs });
       return patch ? goalsHttp.updateGoal(goal.id, patch) : null;
     },
@@ -474,8 +477,7 @@ function GoalForm({
     }
   };
 
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault();
+  const submitValues = (nextValues: FormValues) => {
     // 送信中は二重に送らない（ボタンも押せなくしている）
     if (saving.current || reloadInFlight.current || prepareError instanceof CreateRecoveryError
       || isEditConflict(failedSave) || isCreateBlocked(failedSave)) {
@@ -489,6 +491,11 @@ function GoalForm({
       focusFirstError(found);
       return;
     }
+    if (mode === 'edit' && baseline && initialConfirmation === null
+      && parseGoalAmount(nextValues.initialProgress) !== baseline.initialProgress) {
+      setInitialConfirmation({ ...nextValues });
+      return;
+    }
     onDraftChange(undefined);
     clearSaveFailure();
     setPrepareError(null);
@@ -496,12 +503,12 @@ function GoalForm({
       // 再表示で復元した操作を優先し、storageから別の操作を準備し直さない。
       // 保持中の同じキー・元bodyで結果を確認し、表示中の確定応答で終了する。
       const operation = mode === 'create'
-        ? attempt ?? prepareCreateAttempt(owner!, toCreateBody(values), sessionStorage) : null;
+        ? attempt ?? prepareCreateAttempt(owner!, toCreateBody(nextValues), sessionStorage) : null;
       if (operation) {
         setAttempt(operation);
       }
       saving.current = true;
-      save.mutate({ values, operation });
+      save.mutate({ values: nextValues, operation });
     } catch (error) {
       saving.current = false;
       setPrepareError(error);
@@ -512,6 +519,11 @@ function GoalForm({
         true,
       );
     }
+  };
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (initialConfirmation === null) submitValues(values);
   };
 
   const focusFirstError = (found: FieldErrors) => {
@@ -535,7 +547,7 @@ function GoalForm({
 
   const busy = save.isPending;
   const recoveryBlocked = prepareError instanceof CreateRecoveryError;
-  const inputDisabled = busy || (mode === 'create' && (attempt !== null || recoveryBlocked));
+  const inputDisabled = busy || initialConfirmation !== null || (mode === 'create' && (attempt !== null || recoveryBlocked));
   useEffect(() => {
     if (!focusAfterSave || busy) {
       return;
@@ -700,7 +712,18 @@ function GoalForm({
         </StickyActionBar>
       </form>
 
-      {mode === 'edit' ? (
+      {initialConfirmation && baseline ? (
+        <ConfirmDialog open title={f.initialProgressConfirmTitle}
+          confirmLabel={f.initialProgressConfirmSave} confirmVariant="primary"
+          cancelLabel={f.initialProgressConfirmCancel} busy={busy}
+          onConfirm={() => { submitValues(initialConfirmation); setInitialConfirmation(null); }}
+          onCancel={() => setInitialConfirmation(null)}
+        >
+          <p>開始前の合計：<b>{amountFormat(baseline).total(baseline.initialProgress)}</b> → <b>{amountFormat(initialConfirmation).total(parseGoalAmount(initialConfirmation.initialProgress)!)}</b></p>
+          <p>開始前の合計の差：{parseGoalAmount(initialConfirmation.initialProgress)! >= baseline.initialProgress ? '+' : '−'}{amountFormat(initialConfirmation).total(Math.abs(parseGoalAmount(initialConfirmation.initialProgress)! - baseline.initialProgress))}</p>
+          <p>{f.initialProgressConfirmHelp}</p>
+        </ConfirmDialog>
+      ) : mode === 'edit' ? (
         <ConfirmDialog
           open={deleteOpen}
           title={c.deleteDialog.title}

@@ -71,7 +71,7 @@ export async function registerGoalRoutes(app: FastifyInstance, deps: GoalRouteDe
       if (!goal) return reply.code(404).send(GOAL_NOT_FOUND);
       if (request.query.view === 'r11') return { ...goal, schemaVersion: 'r11-v1' as const };
       // unionの候補照合にも旧schemaを満たす値を渡す。内部の回答欄は旧表現へ含めない。
-      const { questionPrior: _answers, answerRevision: _revision, ...legacyGoal } = goal;
+      const { questionPrior: _answers, answerRevision: _revision, historyRevision: _history, historyFingerprint: _fingerprint, ...legacyGoal } = goal;
       return legacyGoal;
     });
 
@@ -124,7 +124,7 @@ export async function registerGoalRoutes(app: FastifyInstance, deps: GoalRouteDe
           return reply.code(422).send(
             errorBody(
               'GOAL_HAS_LOGS',
-              'timezone and initialProgress cannot be changed once the goal has logs.',
+              'timezone cannot be changed once the goal has record history.',
               result.fields.map((field) => ({ path: `body/${field}`, message: 'cannot be changed once the goal has logs' })),
             ),
           );

@@ -86,7 +86,7 @@ export function GoalFormFields({
   const initialProgressHelp = (
     <>
       <p>{goal ? f.initialProgressHelp(longDate(goal.recordStartDate)) : f.initialProgressHelpNew}</p>
-      {locked ? <LockedNote>{f.lockedInitialProgress}</LockedNote> : null}
+      {mode === 'edit' ? <p>{f.initialProgressCorrectionHelp}</p> : null}
     </>
   );
   // 未選択のエラーは、まだ選んでいない問の下に出す。APIの検査エラーは従来どおり1問目の下に出す
@@ -199,7 +199,7 @@ export function GoalFormFields({
               label={f.initialProgress}
               value={values.initialProgress}
               error={errors.initialProgress}
-              disabled={inputDisabled || locked}
+              disabled={inputDisabled}
               onChange={(v) => update('initialProgress', v)}
               help={initialProgressHelp}
             />
@@ -210,7 +210,7 @@ export function GoalFormFields({
               unit={unit}
               value={values.initialProgress}
               error={errors.initialProgress}
-              disabled={inputDisabled || locked}
+              disabled={inputDisabled}
               onChange={(v) => update('initialProgress', v)}
               help={initialProgressHelp}
             />

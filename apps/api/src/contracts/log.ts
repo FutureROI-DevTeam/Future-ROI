@@ -27,12 +27,21 @@ export const LogPut = Type.Object(
   {
     status: LogStatus,
     expectedGoalSettingsRevision: GoalSettingsRevision,
+    expectedHistoryRevision: Type.Optional(Type.String({ pattern: '^[0-9]+$' })),
     amount: Type.Optional(Type.Integer({ minimum: 1, maximum: INT4_MAX })),
   },
   { ...strict, allOf: [{ if: { properties: { status: { const: 'DONE' } }, required: ['status'] }, then: { required: ['amount'] } }] },
 );
 export type LogPut = Static<typeof LogPut>;
 
+export const HistoryEdit = Type.Object({
+  status: Type.Union([LogStatus, Type.Literal('UNRECORDED')]),
+  amount: Type.Optional(Type.Integer({ minimum: 1, maximum: INT4_MAX })),
+  expectedGoalSettingsRevision: GoalSettingsRevision,
+  expectedHistoryRevision: Type.String({ pattern: '^[0-9]+$' }),
+}, strict);
+export type HistoryEdit = Static<typeof HistoryEdit>;
+export const HistoryEditResult = Type.Object({ historyRevision: Type.String(), log: Type.Union([Log, Type.Null()]) }, strict);
 export const LogParams = Type.Object({ goalId: Type.String(), localDate: LocalDate }, strict);
 export type LogParams = Static<typeof LogParams>;
 

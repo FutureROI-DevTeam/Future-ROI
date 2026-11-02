@@ -143,9 +143,11 @@ const todayRoute = createRoute({
 const historyRoute = createRoute({
   getParentRoute: () => appLayout,
   path: '/goals/$goalId/history',
+  validateSearch: (search: Record<string, unknown>): { date?: string } => typeof search.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(search.date) ? {date:search.date} : {},
   component: function HistoryRoute() {
     const { goalId } = historyRoute.useParams();
-    return <HistoryPage goalId={goalId} />;
+    const {date} = historyRoute.useSearch();
+    return <HistoryPage goalId={goalId} initialDate={date} />;
   },
 });
 

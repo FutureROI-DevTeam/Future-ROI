@@ -263,7 +263,7 @@ appLayoutのroute確認でもquery世代を進め、goalKeys.allをcancel→rese
 
 | 決める部分 | 採用 | 理由 |
 | --- | --- | --- |
-| Goal DTO | 一覧・取得・作成・編集で共通の1形（[goal.ts](../apps/api/src/contracts/goal.ts)）：`id, title, unit, totalRequired, sessionAmount, initialProgress, timezone, recordStartDate, hasLogs, unitLocked, goalSettingsRevision, today, todayStatus, progressDone, targetDate`。`user_id`・`created_at`・`updated_at`は返さない | 画面が一覧とフォームで必要な導出値（記録の有無、Goalのtimezoneでの今日と記録状態）を同じ形で受け取れる。`hasLogs`は「timezoneと初期量を変更できない」表示（R-02）に、`today`／`todayStatus`は一覧の今日状態に使う |
+| Goal DTO | 一覧・取得・作成・編集で共通の1形（[goal.ts](../apps/api/src/contracts/goal.ts)）：`id, title, unit, totalRequired, sessionAmount, initialProgress, timezone, recordStartDate, hasLogs, unitLocked, goalSettingsRevision, today, todayStatus, progressDone, targetDate`。`user_id`・`created_at`・`updated_at`は返さない | 画面が一覧とフォームで必要な導出値（記録の有無、Goalのtimezoneでの今日と記録状態）を同じ形で受け取れる。`hasLogs`は当初「timezoneと初期量を変更できない」表示（R-02）に使った。開始前合計の訂正は[D-34](#d-34-開始前の合計量の訂正319)で更新し、`today`／`todayStatus`は一覧の今日状態に使う |
 | status | `GET` 200、`POST` 201、`PATCH` 200（更新後のGoal）、`DELETE` 204（bodyなし）。他人・存在しない・uuidでないidは404 `NOT_FOUND` | [契約の判断事項](contract-review-proposal.md#apiの未定義部分)の案のうち最も単純な形。uuidでないidはDBへ渡さず、存在を明かさない404へ揃える |
 | 一覧の今日状態 | 配列（wrapperなし）、作成時刻・同時刻ならid順。各Goalに`today`（そのGoalのtimezoneでの暦日）と`todayStatus`（`DONE`／`SKIPPED`／`UNRECORDED`。行がなければ`UNRECORDED`） | Goalと`hasLogs`・今日の記録状態をREPEATABLE READの同じsnapshotで読み、最初のGoal SELECT後に時計を1回取得する。行なしをSKIPPEDにしない（P-14） |
 | 作成 | `initialProgress`省略時は0。timezoneは`地域/都市`形式か`UTC`で、ICUが解決できる名前だけ（略称`JST`・固定オフセット`+09:00`は422）。記録開始日は作成時刻をそのtimezoneで暦日にした値で固定し、`goal.record_start_date`（[migration 0002](../apps/api/migrations/0002_goal_record_start_date.sql)）へ保存して`recordStartDate`で返す | [初期進捗と日々の記録の境界](#初期進捗と日々の記録の境界)の最小案。ブラウザの既定timezoneは画面の責務で、APIは明示送信を受ける |
@@ -386,7 +386,7 @@ CREATE TABLE action_log (
 
 最小案は、Goal作成時のtimezoneで作成日時を暦日に変換し、その日を固定の記録開始日とする。既存の`created_at`とtimezoneは作成時の算出には使えるが、記録がないGoalではtimezoneを変更でき、現在のtimezoneで再算出すると境界がずれる。例：`2026-10-03T00:30:00Z`はAsia/Tokyoでは10/3、America/Los_Angelesでは10/2。現行schemaは作成時timezoneを保持しないため、この2列だけで変更後も元の開始日を確実に復元することはできない。
 
-**実装（#76）**: 固定暦日を1項目保持する。`goal.record_start_date`に作成時刻をGoalのtimezoneで暦日にした値を保存し、Goal DTOの`recordStartDate`で画面・#77と共有する。作成時timezoneの履歴は持たない。ログがない間のtimezone変更を一律禁止する追加規則にはせず、変更後も開始日は動かさず、今日・昨日だけを変更後のGoal timezoneで判定する（[goals.test.ts](../apps/api/tests/goals.test.ts)）。開始日前・今日昨日以外のPUT拒否は#77で実装する。変更後の今日が開始日より前なら、その日も記録対象にしない。ログがある場合のtimezone・初期量の変更禁止は維持する。
+**実装（#76）**: 固定暦日を1項目保持する。`goal.record_start_date`に作成時刻をGoalのtimezoneで暦日にした値を保存し、Goal DTOの`recordStartDate`で画面・#77と共有する。作成時timezoneの履歴は持たない。ログがない間のtimezone変更を一律禁止する追加規則にはせず、変更後も開始日は動かさず、今日・昨日だけを変更後のGoal timezoneで判定する（[goals.test.ts](../apps/api/tests/goals.test.ts)）。開始日前・今日昨日以外のPUT拒否は#77で実装する。変更後の今日が開始日より前なら、その日も記録対象にしない。当時はログがある場合のtimezone・初期量の変更禁止を維持した。専用ローカルブランチでは[D-34](#d-34-開始前の合計量の訂正319)に従い、初期量の制限だけを更新する。
 
 既存Goalは本番DBが未作成のため存在せず、互換処理は実装していない。既存行がある環境へ適用する場合は、現在のtimezoneや最古ログで黙って開始日を埋めず、開始日前ログを自動削除・除外・初期量へ移し替えない方針で別途判断する。初期量から開始日や`observedDays` / `recordedDays`を推測しない。
 
@@ -401,7 +401,7 @@ CREATE TABLE action_log (
 | `/api/auth/*` | Better Authのハンドラ（`sign-up/email`・`sign-in/email`・`sign-out`・`get-session`等。#75で実装）。業務APIの確定契約とは別。回数制限超過は429と`X-Retry-After`（整数秒） |
 | `GET /api/goals` | 自分のGoal一覧。作成順の配列で、各Goalに`today`（Goalのtimezoneでの暦日）・`todayStatus`・`hasLogs`、`unitLocked`・`goalSettingsRevision`を含む（#76、#148）。Goal DTOは記録した累計`progressDone`（`initialProgress`＋今日までのDONEの量。Todayの`prediction.progress.done`と同じ数え方で、総量を超えうる）も含み、一覧の進捗表示に使う（#146）。到達予定日targetDate（未設定null）も含む（#157） |
 | `POST /api/goals` | UUID Idempotency-Key必須。初回201＋Goal DTO、同owner/key/bodyの再送200＋現在DTO、異body409、削除後410（D-29）。body：`title, unit, totalRequired, initialProgress, sessionAmount, timezone, targetDate?`。任意の`targetDate`は暦にある`YYYY-MM-DD`で、作成時timezoneの今日より後だけ（違反は422）。省略・`null`は未設定（#157、P-19）。初期量の既定は0で、記録開始日の前日までの量。timezoneは有効なIANA名のみ（それ以外は422）。記録開始日は作成時のtimezoneの暦日で固定し`recordStartDate`で返す（#76） |
-| `GET / PATCH / DELETE /api/goals/:goalId` | 取得（200）・編集（200。expectedGoalSettingsRevision必須、不一致409。設定／回答項目のないbody・nullableでない項目の`null`は422）。`targetDate`は暦にある`YYYY-MM-DD`で、変更後timezoneの今日より後だけ（違反は422）。`targetDate: null`は未設定に戻す。経過した保存日を維持する編集は`targetDate`を省略する（#157、P-19）。削除は204（記録も連鎖削除）。他人・存在しないidは404。記録があるGoalで`timezone`・`initialProgress`を異なる値へ変えようとすると422 `GOAL_HAS_LOGS`（#76） |
+| `GET / PATCH / DELETE /api/goals/:goalId` | 取得（200）・編集（200。expectedGoalSettingsRevision必須、不一致409。設定／回答項目のないbody・nullableでない項目の`null`は422）。`targetDate`は暦にある`YYYY-MM-DD`で、変更後timezoneの今日より後だけ（違反は422）。`targetDate: null`は未設定に戻す。経過した保存日を維持する編集は`targetDate`を省略する（#157、P-19）。削除は204（記録も連鎖削除）。他人・存在しないidは404。記録履歴があるGoalの`timezone`変更は422 `GOAL_HAS_LOGS`。開始前合計の訂正は[D-34](#d-34-開始前の合計量の訂正319)の設定版CASで扱う（#319、ローカル） |
 | `PUT /api/goals/:goalId/logs/:localDate` | 記録の作成・上書き（200＋Log）。body：`status, expectedGoalSettingsRevision, amount`（DONE必須、SKIPPEDではamount禁止）。古い設定版は409。`localDate`がGoalのtimezoneで今日・昨日以外なら422 `LOG_DATE_OUT_OF_WINDOW`、固定した記録開始日より前なら422 `LOG_DATE_BEFORE_START`。どちらの違反でも記録・初期量を変更しない（#77） |
 | `GET /api/goals/:goalId/logs?from&to` | 記録済みの一覧（行動日の昇順、両端を含む任意の期間。履歴表示用、#77） |
 | `GET /api/goals/:goalId/today` | query省略は`{ today, yesterday, todayLog, yesterdayMissing, prediction: PredictionResult }`。`yesterdayMissing`は昨日が記録開始日以降で未記録のときだけtrue。1つのDB snapshotと1回の時計読み取りから組み立てる（#77） |
@@ -409,6 +409,8 @@ CREATE TABLE action_log (
 | `GET /api/goals/:goalId/today?view=r11` | 依頼者承認のR-11専用Today DTO。保存回答と全実ログの同じsnapshotから、専用prediction・文脈・出所・nullable Planを返す（#133）。DB接続返却後に選択したEngineだけを最大1回実行する |
 
 ### 記録の上書きと予測の再計算
+
+専用ローカルブランチの過去編集・取消と履歴版は[D-33](#d-33-過去記録の編集と履歴版319ローカル検証)を参照する。以下の従来PUTの窓は維持する。
 
 行動日は`localDate`（DBの`local_date`）、入力・更新時刻は`created_at` / `updated_at`であり、後者から行動日を推測しない。保存対象の日付と今日・昨日の判定はGoalのtimezoneでそろえる。UNKNOWNは行がない状態で、記録取消用DELETEは現行契約にない。
 
@@ -933,3 +935,44 @@ Consequences / Reconsideration: 未記録による打切り/区間の機構、�
 参加PUTはreportのconsentRevisionをexpectedConsentRevisionとして照合し、受理/撤回時にGoal上の単調CAS版を進める。古い受理要求の再送による撤回後・期限切れ/purge後の参加復活を拒否する。有効参加を作った同一要求だけを再送可能とし、期限は延ばさない。このGoal metadataには同意履歴や予測labelを残さず、Goal削除で消す。予測contextは編集可否markerのunitLockedを除き、意味を変える設定・質問・build・prefixを保持する。JS/SQLの90日上限は経過2160時間に統一し、DB session timezoneのDSTへ依存させない。詳細と回帰は[設計補助](prediction/milestone-calibration.md#同意cas予測文脈保持期間の追加確認)を参照する。
 
 D-248のGoal UUIDは既存Goal APIの大文字/小文字許可を保持し、補正route境界で正規表記へそろえてscopeを比較する。本人IDを大小変換せず、所有者・参加世代・hashの照合を維持する。
+
+
+### D-33 過去記録の編集と履歴版（#319、ローカル検証）
+
+2026-11-01 / **依頼者承認のローカル実装・検証。main統合・本番migration・チーム採択は未実施。** [P-25](product-spec.md#p-25-goal詳細と過去記録のローカル改善319)を対象とする。
+
+**Context / Decision：** 過去訂正では、日付を入れ替えたりSKIPPEDを削除した場合、累計が同じでも遷移件数・予測が変わる。また行削除後に「行がない」だけを検査すると、古い画面からの再作成を検出できない。このためGoal単位の単調な履歴版を保持し、設定版と合わせて編集開始時の状態を検査する。
+
+- migration `0009_record_history_revision.sql`で`goal.history_revision`（非負bigint）を追加する。action_logの実変更・削除で同transactionのtriggerが版を進める。同値のUPDATEでは進めず、削除後もGoalに版が残る。既存PUT・合成seed経由の変更も検知する。初期値0は導入前の全履歴の基準epochであり、過去の編集回数を捏造しない。
+- `PATCH /api/goals/:goalId/logs/:localDate`のbodyは`status: DONE | SKIPPED | UNRECORDED`、`expectedGoalSettingsRevision`、文字列`expectedHistoryRevision`。DONEは正整数amount必須、他の状態はamount禁止。UNRECORDEDは明示的な取消で、DBの行を削除する。空の行・0量・UNKNOWN値をaction_logへ保存しない。
+- 所有者条件付きGoal行をFOR UPDATEしてから時計を取り、Goal timezoneで開始日〜今日の範囲を検査する。版不一致は409 HISTORY_CONFLICT、他人・存在しないGoalは404、不正量・日付は422。成功は`{ historyRevision, log }`（削除時logはnull）。失敗時は行と版を同時にrollbackする。別の日の編集でも競合する保守的な粒度であり、無断の自動上書きを避ける。
+- 従来PUTの今日・昨日の窓は変更しない。後方互換のためhistory版は省略可能だが、現在のFEは取得済みの版を送る。版を省略する旧クライアントには新しい履歴CASの保証はない。正式統合時に旧クライアントの移行・必須化を判断する。
+- Goal R-11 DTOのhistoryRevisionとToday contextのhistoryRevisionを照合する。履歴画面はGoalの同一snapshotに含めたhistoryFingerprintとログ一覧を照合し、予測APIの成功には依存しない。Todayには同一REPEATABLE READ snapshotの全ログから作るhistoryFingerprint（日付順のdate/status/amountのJSON配列）を付け、FEがログ一覧と照合する。累計一致だけを根拠に古い予測を採用しない。既存応答fixtureとの互換用に追加メタデータは型上optionalだが、実DBのR-11経路では返す。旧Goal DTOの形は変更しない。
+- session確認中は私的DOMを取り除き、継続した同一所有者の未保存入力だけを既存memory draftへ保持する。所有者変更・logout・session失敗で破棄する。編集対象日は開始時に固定し、30秒ごとの日付境界再取得で別の日へ移さない。
+- 保存後はGoal配下の一覧・Today・履歴cacheを無効化して再取得する。以前の整合表示を保持する場合も再取得失敗を表示し、編集を停止する。競合や成否不明時はdraftを保持し、利用者による最新履歴の読み込みと明示保存を必要とする。保存差分は、さらに前後の履歴版が1だけ進んだ場合に限る。
+
+2026-11-02のセルフレビュー修正：過去編集は従来PUTと同じく明示的なREAD COMMITTEDを使い、Goal lock待ち後の最新履歴版を検査する。poolの既定値がREPEATABLE READでもserialization errorへ逸れず、古い編集は409へ至る。保存成功後のcache更新は画面のmount寿命から分離し、同一owner・draft世代が継続する場合だけ行う（離脱後の古いToday表示を防ぎ、別ownerへは持ち越さない）。URLの日付は訪問時の初期選択であり、同owner再確認ではその後の選択日・編集中入力を復元する。URLの日付自体が変わった場合は別の訪問として入力を破棄する。
+
+最終レビューの4件も同じ境界で修正する。応答喪失時はDBがcommit済みかもしれないため、unmount後もowner・draft世代をcancelの前後で検査してcacheを再取得する。formのerror更新だけをmount中に限定し、別ownerへの遅延成功・失敗も無視する。過去月への移動で選択をnullにし、復元memoryがある場合はnullも保ってURL初期日へ戻さない。空グラフでも同じ計測用DOMをmountし、既存ResizeObserverを保持する。足跡の同日Homeではfocus予約を解除する。新しい状態管理・chart依存・API/DB/Engineの変更を要しない最小修正とし、再現条件を回帰へ追加する。
+
+**Alternatives / Reason：** 日ごとの版だけでは未記録・削除・再作成の競合に別の墓標が必要。updated_atだけでは同値への往復と削除を安全に識別できない。Goal単位の版は競合が広い反面、既存のGoal行lockを再利用でき、別テーブルや新技術を要しない。累計照合だけでは同累計の遷移変更を見逃すため、履歴内容も照合する。チャートライブラリ移行は、既存SVGで期間・選択・読み上げを満たせるため行わない。
+
+**Invariants / Non-goals / Consequences：** 所有権、固定記録開始日、整数分、DONE正整数、SKIPPED NULL、UNKNOWN行なし、永続unit lockを保つ。全記録を取り消してもtimezone・初期量の既存の編集制限は解除しない。Engineやg50/P50/P80は不変。公開・本番DB・モデル精度・実利用者受入は対象外。fingerprintは全履歴サイズに比例するため、長期利用の通信量が問題になればversion付き一覧DTO等を比較する。高頻度の別日編集が問題になる場合は競合粒度を再検討する。
+
+全Goalの足跡も既存の`monthCells`の月曜始まり・月初paddingを保持して7列へ配置する。14列の固定最小幅とスクロール位置の副作用を廃止し、上下キーを7日に揃える。日付の集計・timezone・未確認・単位量を合算しない条件は`buildFootprint`をそのまま使う。
+
+**Evidence：** [API回帰](../apps/api/tests/history-edit.test.ts)、[DB既定分離レベルとlock待ちの回帰](../apps/api/tests/history-edit-concurrency.test.ts)、[FE照合・累積回帰](../apps/web/tests/history-edit.test.mjs)、[履歴画面の寿命・所有者回帰](../apps/web/tests/history-lifecycle.browser.tsx)、[足跡の月配置・キー回帰](../apps/web/tests/footprint-calendar.browser.tsx)、[空グラフと日付進行・幅の回帰](../apps/web/tests/chart-rollover.browser.tsx)、既存Chrome回帰と[ローカル検証記録](changes/issue-319-goal-history.md)。テスト成功を本番採択や予測精度の証明にしない。
+
+### D-34 開始前の合計量の訂正（#319）
+
+2026-11-01 / **[P-26](product-spec.md#p-26-開始前の合計量の訂正319)の依頼者承認によるローカル実装・検証。** D-33の初期量ロックだけを更新し、開始日・timezone・単位の境界を保持する。
+
+**Context / Decision：** 初期量はobserveでactualDoneの起点となる量であり、日付や隣接遷移を生成しない。初期量の単独訂正に日時の変更禁止と同じロックは不要である。既存Goal PATCHのinitialProgressとexpectedGoalSettingsRevision、所有者付きGoal行lockを再利用する。合計値を置換し、実変更時だけ設定版を進める。同値再送は版を進めず、古い版は409のままとする。履歴版は日別行が変わらないため進めない。DB migration・新しいAPI経路・新しい予測方式は追加しない。
+
+**UI / Failure：** 初期量だけを常に検査・送信可能にし、timezoneの入力・送信・API制限とは分ける。既存の時間＋分／整数回入力と確認dialogを再利用する。確認中の値を固定し、保存前の旧値・新値・差を示す。正常な同owner session再確認・409・結果不明の失敗では既存フォームのdraftと回復経路を使う。確認dialogをまたいで自動送信しない。
+
+**Consistency / Invariants：** 日別行、履歴版、固定開始日、unit history lock、timezone、質問回答の文脈と版は維持する。初期量訂正で設定版が進むため、古い日別編集の設定版も拒否できる。日別保存が先に完了した場合は、独立した初期量の絶対値訂正と両立し、両方の実量を残す。Goal/Todayの設定版照合と既存cache無効化により異なる版を混ぜず、累積グラフも訂正後の初期量を使う。今日の保存差分の比較ではinitialProgress・設定版の一致を要求し、初期量訂正を今日の増分に見せない。R-12の凍結予測は設定版差でCONTEXT_CHANGED、途中補正はinitialProgressと設定版を含むcontextKey差でINVALIDとし、過去予測を現在の条件へ書き換えない。
+
+**Alternatives / Consequences / Non-goals：** 開始日を遡らせると初期量との二重計上・質問の対象期間の再解釈が必要になる。今日のDONEへ加えると行動日と継続傾向を誤る。調整行や専用履歴tableは今回の訂正に不要な別モデルとなるため導入しない。現在の設定版は変更回数であり、初期量の変更前後を永続監査する機能ではない。監査・開始前の日別記録importが必要になれば別要件で再検討する。
+
+**Evidence：** [API回帰](../apps/api/tests/initial-progress.test.ts)、[フォーム回帰](../apps/web/tests/goal-form.test.mjs)、既存session/browser回帰と[実Chrome検証](changes/issue-319-goal-history.md)。数値核の一致を実利用者受入・予測精度の証明とは扱わない。

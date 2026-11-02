@@ -9,12 +9,13 @@ import { authClient } from '../../auth/client.ts';
 import { classifySaveError, TodayDateChangedError, toLogPut, type RecordChoice } from './record-log.ts';
 import { confirmedSaveFeedback, createSavePeerGuard, type FeedbackSnapshot, type SaveFeedback } from './save-feedback.ts';
 
-export type RecordContext = Pick<Goal, 'id' | 'unit' | 'timezone' | 'goalSettingsRevision'>;
+export type RecordContext = Pick<GoalR11, 'id' | 'unit' | 'timezone' | 'goalSettingsRevision' | 'historyRevision'>;
 export type SaveVars = {
   goalId: string;
   localDate: string;
   choice: RecordChoice;
   expectedGoalSettingsRevision: number;
+  expectedHistoryRevision?: string;
   unit: Goal['unit'];
   timezone: string;
 };
@@ -31,6 +32,7 @@ export function captureSave(context: RecordContext, localDate: string, choice: R
     localDate,
     choice: { ...choice },
     expectedGoalSettingsRevision: context.goalSettingsRevision,
+    ...(context.historyRevision === undefined ? {} : { expectedHistoryRevision: context.historyRevision }),
     unit: context.unit,
     timezone: context.timezone,
   };
@@ -39,7 +41,7 @@ export function rebaseSave(vars: SaveVars, latest: RecordContext): SaveVars | nu
   if (latest.id !== vars.goalId || latest.unit !== vars.unit || latest.timezone !== vars.timezone) {
     return null;
   }
-  return { ...vars, expectedGoalSettingsRevision: latest.goalSettingsRevision };
+  return { ...vars, expectedGoalSettingsRevision: latest.goalSettingsRevision, ...(latest.historyRevision === undefined ? {} : { expectedHistoryRevision: latest.historyRevision }) };
 }
 
 export function useSaveLog(goalId: string, { onSaved, localDate, canSaveDate, isStaleDate, context }: {
@@ -146,7 +148,7 @@ export function useSaveLog(goalId: string, { onSaved, localDate, canSaveDate, is
       if (!dateAllowed(vars.localDate)) {
         throw new TodayDateChangedError();
       }
-      return todayHttp.putLog(vars.goalId, vars.localDate, toLogPut(vars.choice, vars.expectedGoalSettingsRevision));
+      return todayHttp.putLog(vars.goalId, vars.localDate, { ...toLogPut(vars.choice, vars.expectedGoalSettingsRevision), ...(vars.expectedHistoryRevision === undefined ? {} : { expectedHistoryRevision: vars.expectedHistoryRevision }) });
     },
     onSuccess: async (saved, vars, evidence) => {
       await queryClient.invalidateQueries({ queryKey: goalKeys.all });

@@ -1,0 +1,27 @@
+// Dedicated synthetic DB only. Never reads .env or DATABASE_URL.
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { createTestDatabase } from '../../apps/api/tests/helpers/database.ts';
+import { migrate } from '../../apps/api/src/db/migrate.ts';
+import { startStack, Client } from '../../apps/api/tests/helpers/stack.ts';
+import { shiftLocalDate, localDateIn } from '../../apps/api/src/goals/local-date.ts';
+delete process.env.DATABASE_URL;
+const db=await createTestDatabase();
+await migrate(db.pool);
+const origin='http://127.0.0.1:5319';
+const stack=await startStack(db,{baseURL:origin});
+const c=new Client(stack.app,origin);
+const email='history319@example.test', password='History319-local-only!';
+const signup=await c.sendExact('POST','/api/auth/sign-up/email',{name:'ローカル確認',email,password});
+if(signup.status!==200) throw new Error(signup.body);
+const goal=(await c.call('POST','/api/goals',{title:'英語の学習',unit:'minutes',totalRequired:12000,sessionAmount:45,initialProgress:300,timezone:'Asia/Tokyo'})).json!;
+const today=localDateIn(new Date(),'Asia/Tokyo');
+await db.pool.query('update goal set record_start_date=$2::date where id=$1',[goal.id,shiftLocalDate(today,-120)]);
+for(let i=120;i>=1;i--) await db.pool.query('insert into action_log(goal_id,local_date,status,amount) values ($1,$2::date,$3,$4)',[goal.id,shiftLocalDate(today,-i),i%7===0?'SKIPPED':'DONE',i%7===0?null:30+i%5*5]);
+const second=(await c.call('POST','/api/goals',{title:'読書の習慣',unit:'sessions',totalRequired:200,sessionAmount:1,timezone:'Asia/Tokyo'})).json!;
+await db.pool.query('update goal set record_start_date=$2::date where id=$1',[second.id,shiftLocalDate(today,-45)]);
+await db.pool.query('insert into action_log(goal_id,local_date,status,amount) values ($1,$2::date,$3,$4)',[second.id,shiftLocalDate(today,-1),'DONE',2]);
+mkdirSync(new URL('../../.local/319/',import.meta.url),{recursive:true});
+writeFileSync(new URL('../../.local/319/session.json',import.meta.url),JSON.stringify({goalId:goal.id,secondId:second.id,today,origin,email,password}));
+await stack.app.listen({host:'127.0.0.1',port:4319});
+console.log('Local synthetic DB and API ready at 127.0.0.1:4319');
+for(const signal of ['SIGINT','SIGTERM'] as const) process.on(signal,()=>void (async()=>{await stack.close();await db.close();process.exit(0)})());

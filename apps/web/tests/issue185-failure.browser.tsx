@@ -338,7 +338,7 @@ async function run() {
   await check();
   ensure(view().title === 'A-PRIVATE-185-DRAFT' && view().total === '123' && view().amount === '17', 'fresh GET replaced conflicted input: ' + JSON.stringify(view()));
   ensure(view().submitDisabled, 'fresh GET cleared conflict lock: ' + JSON.stringify(view()));
-  ensure(view().initialDisabled, 'fresh hasLogs lock missing');
+  ensure(!view().initialDisabled && host.querySelector<HTMLSelectElement>('#goal-timezone')?.disabled, 'fresh timezone lock or initial correction eligibility missing');
   await formSubmit(); ensure(writes.length === conflictCount, 'programmatic conflict submit sent');
   await reload(); ensure(!view().conflict && view().title === 'A-PRIVATE-185-DRAFT' && view().total === '123', 'explicit rebase lost edited input');
   await check(); ensure(!view().conflict && view().title === 'A-PRIVATE-185-DRAFT', 'check resurrected old409');

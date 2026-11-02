@@ -195,7 +195,7 @@ test('編集: 省略は維持、空object・null・未知の項目は422、記�
   assert.deepEqual(moved.json, { ...goal, title: '英語 45分', sessionAmount: 45, timezone: 'America/Los_Angeles', initialProgress: 100, unitLocked: true, goalSettingsRevision: 2, recordStartDate: '2026-10-06', today: '2026-10-05', progressDone: 100 });
 });
 
-test('記録があるGoalはtimezoneとinitialProgressを変更できない（同じ値の再送は通る）。一覧は今日の記録状態を含む', async (t) => {
+test('記録があるGoalのtimezone変更は初期量訂正を含む要求全体を拒否する。一覧は今日の記録状態を含む', async (t) => {
   const { db, stack } = await setup(t, { now: () => NOW });
   const a = await signedInClient(stack.app, 'locked');
   const goal = (await a.call('POST', '/api/goals', validGoal)).json as unknown as Goal;
@@ -210,7 +210,7 @@ test('記録があるGoalはtimezoneとinitialProgressを変更できない（�
   const locked = await a.call('PATCH', `/api/goals/${goal.id}`, { title: '英語', timezone: 'America/Los_Angeles', initialProgress: 10 });
   assert.equal(locked.status, 422);
   assert.equal((locked.json?.error as { code: string }).code, 'GOAL_HAS_LOGS');
-  assert.deepEqual(fieldPaths(locked.json), ['body/initialProgress', 'body/timezone']);
+  assert.deepEqual(fieldPaths(locked.json), ['body/timezone']);
   // 全体が拒否され、titleも変わらない
   assert.deepEqual((await a.call('GET', `/api/goals/${goal.id}`)).json, after);
 

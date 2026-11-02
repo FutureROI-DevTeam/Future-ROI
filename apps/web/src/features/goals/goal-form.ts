@@ -27,7 +27,7 @@ export type FormValues = {
 };
 
 /** 編集の比較元。R-11 の読み取り（?view=r11）で得た回答と版を持つ。 */
-export type GoalWithAnswers = Goal & { questionPrior?: QuestionAnswers; answerRevision?: number };
+export type GoalWithAnswers = Goal & { historyRevision?: string; questionPrior?: QuestionAnswers; answerRevision?: number };
 
 export const NO_ANSWERS: QuestionAnswers = { a: null, b: null };
 export type FieldName = keyof FormValues;
@@ -105,7 +105,7 @@ function amountError(raw: string, minimum: 0 | 1, allowTime = false): string | u
 }
 
 /**
- * 記録があるGoalの timezone・initialProgress は送らないため検査しない。
+ * 記録があるGoalのtimezoneは送らない。開始前の累計は記録後も検査・訂正する。
  * today は選択中timezoneの今日。保存済みの日付を変えない編集は期限経過後も許可する（P-19）。
  */
 export function validate(
@@ -143,11 +143,9 @@ export function validate(
   )) {
     errors.targetDate = e.targetDatePast;
   }
+  const initial = amountError(values.initialProgress, 0, values.unit === 'minutes');
+  if (initial) errors.initialProgress = initial;
   if (!locked) {
-    const initial = amountError(values.initialProgress, 0, values.unit === 'minutes');
-    if (initial) {
-      errors.initialProgress = initial;
-    }
     if (!isValidTimezone(values.timezone)) {
       errors.timezone = e.timezone;
     }
@@ -309,7 +307,7 @@ export async function reloadLatestGoal(
 
 /**
  * 編集で送る内容。変えた項目だけを送る（API は空の変更を 422 にするため、変更がなければ null）。
- * 記録があるGoalでは timezone と initialProgress を送らない。
+ * 記録があるGoalではtimezoneを送らない。初期量は差分だけ送る。
  * R-11 の回答（#133 の契約）：
  * - 回答を変えたら、両方の問い（変えていない方も）と、比較元の版（expectedAnswerRevision）を送る。撤回は両方 null
  * - 単位か1回の量を変えるときは、回答は送らず（API が取り消す）、版だけを送る。回答を同時に送ると 422
@@ -336,10 +334,10 @@ export function toPatchBody(values: FormValues, goal: GoalWithAnswers): GoalPatc
   if ((values.targetDate || null) !== (goal.targetDate ?? null)) {
     patch.targetDate = values.targetDate || null;
   }
-  if (!goal.hasLogs) {
-    if (int(values.initialProgress) !== goal.initialProgress) {
-      patch.initialProgress = int(values.initialProgress);
-    }
+  if (int(values.initialProgress) !== goal.initialProgress) {
+    patch.initialProgress = int(values.initialProgress);
+  }
+  if (!goal.hasLogs && !(Number(goal.historyRevision ?? 0) > 0)) {
     if (values.timezone !== goal.timezone) {
       patch.timezone = values.timezone;
     }
