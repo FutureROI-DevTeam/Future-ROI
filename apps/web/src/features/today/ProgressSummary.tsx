@@ -154,7 +154,8 @@ function CumulativeChartView({
   const line = c.points.map((p) => `${p.x},${p.y}`).join(' ');
   const area = `${b.left},${c.zeroY} ${line} ${b.right},${c.zeroY}`;
   const lastPoint = c.points[c.points.length - 1];
-  if (!selected) return <p className="fr-note">今日（{today}）は記録開始日（{recordStartDate}）より前です。表示できる記録日はまだありません。</p>;
+  // Keep the measured node mounted so a later day can reveal the chart without losing its observer.
+  if (!selected) return <div ref={ref} className="fr-chart-box"><p className="fr-note">今日（{today}）は記録開始日（{recordStartDate}）より前です。表示できる記録日はまだありません。</p></div>;
   return (
     <div ref={ref} className="fr-chart-box">
       <div className="fr-chart-controls" role="group" aria-label="グラフの表示期間">

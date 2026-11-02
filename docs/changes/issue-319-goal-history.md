@@ -256,3 +256,41 @@ PC 1440pxとスマホ390pxで確認し、横overflowなし。修正後の[スマ
 | スマホ390px | [修正前](assets/issue-319/footprint-before-390.png) | [修正後](assets/issue-319/footprint-after-390.png) |
 | 中間幅768px | [修正前](assets/issue-319/footprint-before-768.png) | [修正後](assets/issue-319/footprint-after-768.png) |
 | PC 1440px | — | [修正後](assets/issue-319/footprint-after-1440.png) |
+
+## 2026-11-02：最終レビュー4件の修正と再確認
+
+依頼者が4件すべての修正・回帰テスト・実ブラウザ再確認・PR #320への反映を承認した。上の足跡カレンダー追補`4f223ad`を比較元とし、API・DB・Prediction Engine・依存を追加変更せずに修正した。merge・deployは行わない。
+
+| 再現した不具合 | 原因と最小修正 | 修正後の実Chrome確認 |
+| --- | --- | --- |
+| 履歴保存中に離脱し、DB commit後に応答だけ失うと、DBは20分でもTodayは0分のまま | catchのunmount条件がcache更新も止めていた。成功・失敗とも同一owner・draft世代を確認してGoal配下を再取得し、formの状態更新だけmount中に限定する | 実APIの200・DB20分を確認後、応答をabort。離脱先のTodayが20分になり、Goal・Today・ログの3GETを確認。書き込みの再送なし |
+| 10月を表示しているのに、選択なしで11月2日の編集ができる | 未選択を無条件に今日へ補っていた。過去月はnullにし、明示選択まで編集を無効化する。正常な同owner再確認でもnullをURL初期日へ戻さない | URLは11月2日のまま10月へ移動し、編集無効を確認。実session再確認200後も10月・未選択を保持。10月1日を選ぶと同日の保存済み35分を編集できる |
+| 開始日前の空グラフから日付が進むと、SVG幅350pxが狭い画面へ追従しない | 初期の空表示に計測refがなく、一度だけのeffectがobserverを作れなかった。同じ計測用divを空表示にも保持する | 今日11月1日・開始11月2日の合成Goalで日付進行を制御。390px時はSVG/容器322px、320px時は両方252px。再読込なしで追従 |
+| 月初でHomeを押した後、前月ボタンへ移って月送りすると日付へfocusが飛ぶ | 同日操作でstate更新が起きず、focus予約だけ残っていた。同じ対象日なら予約を解除する | Homeなし／Home2回の両方で10月→9月の月送り後も「足跡の前の月」ボタンへfocusを保持 |
+
+実APIの検証は既存のローカル検証用DBと合成アカウントだけを使用した。応答喪失・空グラフ用に作った一時Goalは各スクリプトのfinallyで削除した。利用者のGoal・記録には書き込んでいない。日付進行の実画面検証はブラウザ時計・読取応答の今日を制御して30秒の境界再取得を実行し、API時計やEngineの計算方式は変更していない。
+
+### 回帰と実行結果
+
+- [履歴寿命回帰](../../apps/web/tests/history-lifecycle.browser.tsx)：7ケース。既存のURL変更・入力復元・離脱後成功を保ち、過去月の明示選択と未選択の再確認、commit後の応答喪失、別ownerへの遅延成功・失敗を検査。保存は明示4回のみで自動再送なし。
+- [足跡回帰](../../apps/web/tests/footprint-calendar.browser.tsx)：既存4ケースを保ち、同日Home後の月送りでfocusを奪わないケースを追加して5ケース。
+- [グラフ幅回帰](../../apps/web/tests/chart-rollover.browser.tsx)：実ProgressDetails・本番CSS・ResizeObserverで、空表示→初日・縮小・再度空表示→再表示を2ケースとして検査する。
+
+| 検証 | 結果 | Git除外の証跡 |
+| --- | --- | --- |
+| Web Unit | 201成功、失敗0。既存のブラウザ別実行案内skip 1 | `.local/319/fix-four/web-unit.log` |
+| Chrome回帰全件 | 25成功、失敗・skip 0。上記7・5・2ケースを含む | `.local/319/fix-four/native-all.log` |
+| 保存差分・レスポンシブ回帰 | 1成功、42シナリオ。320/390/768/1440px | `.local/319/fix-four/feedback.log` |
+| 最終ソースの全workspace typecheck / build | 両方exit 0。既存bundle警告あり | `.local/319/fix-four/typecheck-final.log`・`build-final.log` |
+| Foundation | 122 text files・2826 local links・環境例・ignore・差分空白の検査成功 | `.local/319/fix-four/foundation.log` |
+| 実アプリ・検証用DB | 上表4件、未選択の実session再確認、PC1440px・スマホ390/320pxを確認 | `.local/319/fix-four/ambiguous-save.log`・`navigation.log`・`chart-width.log`・`empty-selection-recheck.log` |
+
+追加の幅回帰の初回実行はdump-domの仮想時間ではresize後の描画フレームを正しく待てず失敗した。hook用の既存24テストの経路は変えず、このレイアウト回帰だけ既存`launchBrowser`のCDP経路へ切り替えてnative ResizeObserverの通知を待つようにした。対象3テストと全25テストを再実行して成功した。既存のassertion・timeout・テストを緩和・削除・skipしていない。
+
+### 変更ファイルと残る境界
+
+実装はHistoryEditor.tsx・HistoryPage.tsx・ProgressSummary.tsx・GoalFootprint.tsxの4ファイル。テストは上記3entryと既存session-cache.browser-check.mjs。P-25・D-33・変更対応表と本記録を同期した。README・起動手順・環境変数・API契約はこの追補で変えず、追加更新不要と判断した。
+
+review-gateで離脱・応答喪失・別owner・日付null復元・計測DOM・focus予約と既存回帰を照合した。追加のBlockingは検出していない。Safari/iOS実機・実screen reader・人間の受入・ローカルNode 24.22.1・本番migration/deployは未検証。CIの最終SHAと結果はPR/Issueで記録する。旧PUTの履歴版移行・fingerprintの長期通信量など、前段の統合判断は引き続き残る。
+
+新しい共有画像も合成データのみ：[スマホ・過去月の未選択保持](assets/issue-319/review-empty-month-390.png)、[PC・明示選択した10月1日の編集](assets/issue-319/review-selected-day-1440.png)。修正前の4件の再現結果は`.local/319/last-review/`に保持し、修正後のログと画像は`.local/319/fix-four/`へ保存した。

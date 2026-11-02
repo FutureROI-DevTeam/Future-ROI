@@ -66,6 +66,7 @@ export function GoalFootprint({ sources, onRefresh }: { sources: readonly Footpr
             event.preventDefault();
             const targetMonth = targetDate.slice(0,7);
             if (targetMonth < first || targetMonth > last) return;
+            if (targetDate === date) { keyboardFocus.current = false; return; }
             keyboardFocus.current = true;
             if (targetMonth !== shown) setMonth(targetMonth);
             setSelected(targetDate);

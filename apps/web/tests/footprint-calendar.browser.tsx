@@ -78,6 +78,14 @@ async function run() {
   ensure(focused() === '2026-11-30', 'End did not choose last month day');
   await key('ArrowRight'); ensure(focused() === '2026-11-30', 'keyboard escaped last allowed month');
   results.push('Sunday start, before-start/future distinction and last-month boundary');
+
+  await render([source('2024-01-01', '2024-05-31')]);
+  await click(previous()); await click(day('2024-04-01')); day('2024-04-01').focus();
+  await key('Home'); await key('Home'); // No date change must not leave a deferred focus request.
+  previous().focus(); await click(previous());
+  ensure(document.activeElement === previous(), 'a no-op Home stole focus from month navigation');
+  month('2024-03-01', 31, 4);
+  results.push('no-op Home leaves no pending focus when the month button is used');
   await act(async () => root.unmount());
   return { results };
 }

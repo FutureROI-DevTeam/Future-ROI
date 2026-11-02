@@ -240,9 +240,9 @@ TodayのP80計算範囲の文言（[#154](https://github.com/jogi-hack-2026-team
 
 [API回帰](../apps/api/tests/history-edit.test.ts)は同時編集・取消後の古い版・同累計の履歴変更・認可・失敗rollback・DSTを、[FE回帰](../apps/web/tests/history-edit.test.mjs)は期間前累計・未記録と休み・履歴内容のずれを検査する。既存の保存・session・レスポンシブChrome回帰と、専用ローカルDBにつないだ実画面の確認は[検証記録](changes/issue-319-goal-history.md)へ追跡する。ローカル実装の状態であり、main統合・本番migration・人間受入は含まない。
 
-セルフレビューで発見したlock待ち後の古い版は[分離レベル回帰](../apps/api/tests/history-edit-concurrency.test.ts)、URL初期日と復元入力・離脱後のcache更新・別ownerへの遅延保存は[実Chrome回帰](../apps/web/tests/history-lifecycle.browser.tsx)（既存[runner](../apps/web/tests/session-cache.browser-check.mjs)に登録）で検査する。
+セルフレビューで発見したlock待ち後の古い版は[分離レベル回帰](../apps/api/tests/history-edit-concurrency.test.ts)、URL初期日と復元入力・過去月の未選択復元・離脱後の成功／応答喪失によるcache更新・別ownerへの遅延保存は[実Chrome回帰](../apps/web/tests/history-lifecycle.browser.tsx)（既存[runner](../apps/web/tests/session-cache.browser-check.mjs)に登録）で検査する。[グラフ幅の回帰](../apps/web/tests/chart-rollover.browser.tsx)は実ProgressDetails/CSS/ResizeObserverで開始日前→初日・縮小・再表示を検査し、既存CDP helperの実描画フレームで実行する。
 
-足跡の7列カレンダーは[GoalFootprint](../apps/web/src/features/goals/GoalFootprint.tsx)と[goals.css](../apps/web/src/features/goals/goals.css)で表示し、既存`monthCells`と集計を再利用する。[カレンダー回帰](../apps/web/tests/footprint-calendar.browser.tsx)は曜日・閏月・月境界とフォーカス移動、[既存レスポンシブ回帰](../apps/web/tests/goal-feedback.browser-check.mjs)は320/390/768/1440pxのカレンダー内部overflow・7列・操作対象の寸法を検査する。
+足跡の7列カレンダーは[GoalFootprint](../apps/web/src/features/goals/GoalFootprint.tsx)と[goals.css](../apps/web/src/features/goals/goals.css)で表示し、既存`monthCells`と集計を再利用する。[カレンダー回帰](../apps/web/tests/footprint-calendar.browser.tsx)は曜日・閏月・月境界とフォーカス移動、同日Home後の月送りでfocusを奪わないことを、[既存レスポンシブ回帰](../apps/web/tests/goal-feedback.browser-check.mjs)は320/390/768/1440pxのカレンダー内部overflow・7列・操作対象の寸法を検査する。
 
 ### 開始前の合計量の訂正（#319追補）
 

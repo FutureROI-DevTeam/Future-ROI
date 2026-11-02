@@ -23,6 +23,12 @@ export function HistoryEditor({goal,date,log,onClose,onSaved,initial,onDraftChan
   const client=useQueryClient();
   useEffect(()=>{alive.current=true;heading.current?.focus();return()=>{alive.current=false}},[]);
   useEffect(()=>{onDraftChange?.({goal:base.goal,date:base.date,status,amount,error,conflict,pending:busy});},[base.goal,base.date,status,amount,error,conflict,busy,onDraftChange]);
+  const refreshOwnedCache=async()=>{
+    if(typeof base.owner!=='string' || !isDraftOwner(base.owner,base.generation))return;
+    await client.cancelQueries({queryKey:goalKeys.all});
+    if(!isDraftOwner(base.owner,base.generation))return;
+    await client.invalidateQueries({queryKey:goalKeys.all});
+  };
   const submit=async()=>{
     if(inFlight.current || conflict || !privateDataReady(getPrivateEpoch()) || (typeof base.owner!=='string' || !isDraftOwner(base.owner,base.generation)))return;
     if(status==='DONE' && (!/^\d+$/.test(amount) || !isRecordAmount(Number(amount)))){setError('実施量は1以上の整数で入力してください。0は休み・削除へ変換されません。');return;}
@@ -31,18 +37,18 @@ export function HistoryEditor({goal,date,log,onClose,onSaved,initial,onDraftChan
     const guard=createSavePeerGuard(base.goal.id,()=>{});guard.start();
     try{
       await requestJson(HistoryEditResult,'/api/goals/'+encodeURIComponent(base.goal.id)+'/logs/'+base.date,{method:'PATCH',body:{status,expectedGoalSettingsRevision:base.goal.goalSettingsRevision,expectedHistoryRevision:base.goal.historyRevision,...(status==='DONE'?{amount:Number(amount)}:{})}});
-      // A confirmed write must refresh the same owner's cache even after leaving this editor.
-      if(typeof base.owner!=='string' || !isDraftOwner(base.owner,base.generation))return;
-      await client.cancelQueries({queryKey:goalKeys.all});
-      if(!isDraftOwner(base.owner,base.generation))return;
-      await client.invalidateQueries({queryKey:goalKeys.all});
+      await refreshOwnedCache();
       if(alive.current && typeof base.owner==='string' && isDraftOwner(base.owner,base.generation))onSaved();
     }catch(e){
-      if(!alive.current || typeof base.owner!=='string' || !isDraftOwner(base.owner,base.generation))return;
+      if(typeof base.owner!=='string' || !isDraftOwner(base.owner,base.generation))return;
       const changed=e instanceof ApiError && e.status===409;
-      setError(changed?'別の画面で記録または設定が変わりました。最新の内容を読み込み、確認してから編集し直してください。':'保存を確認できませんでした。入力は保持しています。読み込み直して保存状態を確認してください。');
       // An ambiguous failure must never replay an old epoch automatically.
-      setConflict(true);
+      if(alive.current){
+        setError(changed?'別の画面で記録または設定が変わりました。最新の内容を読み込み、確認してから編集し直してください。':'保存を確認できませんでした。入力は保持しています。読み込み直して保存状態を確認してください。');
+        setConflict(true);
+      }
+      // The server may have committed before the response was lost, including after leaving.
+      await refreshOwnedCache();
     }finally{guard.end();guard.close();inFlight.current=false;if(alive.current)setBusy(false)}
   };
   return <section className="fr-history-editor" aria-labelledby="fr-history-edit-title">

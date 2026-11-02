@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
+import { launchBrowser } from './browser-startup.mjs';
 
 // 既存 Vite/React だけで bundle し、Chromium の実DOMで hook を検査する。新しいテスト依存は不要。
 // CI ubuntu-latest の Chrome、Windows の既存 Chrome/Edge、または明示した TEST_BROWSER を使う。
@@ -70,7 +71,7 @@ function setupSessionTransport() {
   };
 }
 
-async function runBrowser(t, entry, mockAuth, realRouter = false) {
+async function runBrowser(t, entry, mockAuth, realRouter = false, liveLayout = false) {
   const browser = await browserPath();
   const dir = await mkdtemp(join(tmpdir(), 'futureroi-session-test-'));
   t.after(() => {
@@ -113,6 +114,27 @@ async function runBrowser(t, entry, mockAuth, realRouter = false) {
     server.close(resolve);
   }));
   const { port } = server.address();
+  // ResizeObserver needs native render frames; --dump-dom virtual time is for hook-only checks.
+  if (liveLayout) {
+    const session = launchBrowser({ browser, profile: join(dir, 'profile'), signal: t.signal,
+      args: ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--remote-debugging-port=0', '--user-data-dir=' + join(dir, 'profile'), 'about:blank'],
+      diagnostic: value => t.diagnostic(JSON.stringify(value)) });
+    try {
+      const cdp = await session.ready();
+      await cdp.send('Page.navigate', { url: `http://127.0.0.1:${port}/` });
+      for (let i = 0; i < 300; i++) {
+        const response = await cdp.send('Runtime.evaluate', { expression: 'document.getElementById("result")?.textContent', returnByValue: true });
+        const payload = response.result?.value;
+        if (payload && payload !== 'PENDING') {
+          const result = JSON.parse(payload);
+          assert.equal(result.ok, true, result.error);
+          return result;
+        }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      assert.fail('browser did not finish native layout regression');
+    } finally { await session.stop(); }
+  }
   const { stdout, stderr } = await promisify(execFile)(browser, [
     '--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     `--user-data-dir=${join(dir, 'profile')}`, '--dump-dom', `--virtual-time-budget=${realRouter ? 60000 : 15000}`, `http://127.0.0.1:${port}/`,
@@ -156,15 +178,22 @@ test('same-owner draft: actual router/hooks preserve idle input only across succ
 
 test('#319 history lifecycle: URL entry, same-owner confirmation, unmounted saves and owner changes', { timeout: 180000 }, async (t) => {
   const result = await runBrowser(t, './history-lifecycle.browser.tsx', false);
-  assert.equal(result.results.length, 4);
-  assert.equal(result.saves, 2);
+  assert.equal(result.results.length, 7);
+  assert.equal(result.saves, 4);
   assert.equal(result.writes, 0);
   t.diagnostic(JSON.stringify(result));
 });
 
 test('#319 footprint calendar: weekdays, leap month, focus and week/month navigation', { timeout: 180000 }, async (t) => {
   const result = await runBrowser(t, './footprint-calendar.browser.tsx', true);
-  assert.equal(result.results.length, 4);
+  assert.equal(result.results.length, 5);
+  t.diagnostic(JSON.stringify(result));
+});
+
+test('#319 chart rollover: empty state retains width measurement when dates advance and viewport shrinks', { timeout: 180000 }, async (t) => {
+  const result = await runBrowser(t, './chart-rollover.browser.tsx', true, false, true);
+  assert.equal(result.results.length, 2);
+  assert.ok(result.narrow < result.initial);
   t.diagnostic(JSON.stringify(result));
 });
 

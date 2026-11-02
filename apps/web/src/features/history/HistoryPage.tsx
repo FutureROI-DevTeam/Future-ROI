@@ -86,7 +86,9 @@ function PrivateHistory({ goalId, clearedAt, initialMonth, onRemember, initialMe
   initialMemory?: HistoryMemory | undefined;
 }) {
   const { goalQuery, logsQuery, snapshot, refresh, resyncFailed } = useHistoryData(goalId, clearedAt);
-  const [selected,setSelected] = useState<string|null>(initialMemory?.editor?.date ?? initialMemory?.selected ?? initialDate ?? null);
+  const [selected,setSelected] = useState<string|null>(()=>initialMemory
+    ? initialMemory.editor?.date ?? initialMemory.selected ?? null
+    : initialDate ?? null);
   const [editing,setEditing] = useState(!!initialMemory?.editor);
   const [editorDraft,setEditorDraft] = useState<HistoryDraft|null>(initialMemory?.editor ?? null);
   const [message,setMessage] = useState<string|null>(null);
@@ -145,9 +147,9 @@ function PrivateHistory({ goalId, clearedAt, initialMonth, onRemember, initialMe
 
   };
   const validSelected = selected && /^\d{4}-\d{2}-\d{2}$/.test(selected) && !Number.isNaN(Date.parse(selected+'T00:00:00Z')) && new Date(selected+'T00:00:00Z').toISOString().slice(0,10)===selected;
-  const date = validSelected ? selected : goal.today;
+  const date = validSelected ? selected : shown === last ? goal.today : null;
   const log=logs.find(l=>l.localDate===date);
-  const canEdit=date>=goal.recordStartDate && date<=goal.today && !error && !resyncFailed && snapshot?.goal===goalQuery.data && snapshot?.logs===logsQuery.data;
+  const canEdit=date!==null && date>=goal.recordStartDate && date<=goal.today && !error && !resyncFailed && snapshot?.goal===goalQuery.data && snapshot?.logs===logsQuery.data;
   return (
     <div className="fr fr-page fr-page--desk fr-page--history">
       <PageTitle title={`${c.historyTitle}（${goal.title}）`} />
@@ -200,16 +202,16 @@ function PrivateHistory({ goalId, clearedAt, initialMonth, onRemember, initialMe
               {weekday}
             </li>
           ))}
-          {monthCells(shown).map((date, i) => {
-            if (date === null) {
+          {monthCells(shown).map((cellDate, i) => {
+            if (cellDate === null) {
               return <li key={`pad-${i}`} aria-hidden="true" />;
             }
-            const state = dayState(date, logs, goal.recordStartDate, goal.today);
-            const day = Number(date.slice(8, 10));
-            const label = `${Number(date.slice(5, 7))}月${day}日${state === 'outside' ? '' : ` ${c.dayStateLabel[state]}`}`;
+            const state = dayState(cellDate, logs, goal.recordStartDate, goal.today);
+            const day = Number(cellDate.slice(8, 10));
+            const label = `${Number(cellDate.slice(5, 7))}月${day}日${state === 'outside' ? '' : ` ${c.dayStateLabel[state]}`}`;
             return (
-              <li key={date} aria-label={label}>
-                <button type="button" className="fr-history__day" aria-label={label} aria-pressed={date===(selected ?? goal.today)} disabled={editing} onClick={()=>{setSelected(date);setMessage(null)}}>
+              <li key={cellDate} aria-label={label}>
+                <button type="button" className="fr-history__day" aria-label={label} aria-pressed={cellDate===date} disabled={editing} onClick={()=>{setSelected(cellDate);setMessage(null)}}>
                   <DayMark state={state} size={36} /><span aria-hidden="true">{day}</span>
                 </button>
               </li>
@@ -218,11 +220,12 @@ function PrivateHistory({ goalId, clearedAt, initialMonth, onRemember, initialMe
         </ul>
         {error || resyncFailed ? <p role="alert">履歴の更新を確認できません。<Button variant="text" onClick={refresh}>読み込み直す</Button></p>:null}
         {message?<p role="status">{message}</p>:null}
-        {editing?<HistoryEditor key={date} initial={editorDraft ?? undefined} onDraftChange={setEditorDraft} goal={goal} date={date} log={log} onClose={()=>{setEditing(false);refresh();requestAnimationFrame(()=>editEntry.current?.focus())}} onSaved={()=>{setEditing(false);setMessage('記録を保存しました。累計と予測を確認しています。');requestAnimationFrame(()=>editEntry.current?.focus())}}/>:
+        {editing && date?<HistoryEditor key={date} initial={editorDraft ?? undefined} onDraftChange={setEditorDraft} goal={goal} date={date} log={log} onClose={()=>{setEditing(false);refresh();requestAnimationFrame(()=>editEntry.current?.focus())}} onSaved={()=>{setEditing(false);setMessage('記録を保存しました。累計と予測を確認しています。');requestAnimationFrame(()=>editEntry.current?.focus())}}/>:
           <section className="fr-history-selection" aria-label="選択した日の記録">
-            <h2>{longDate(date)}</h2>
-            <p>{date<goal.recordStartDate?'記録開始前':date>goal.today?'未来の日付':log?.status==='DONE'?'やった '+amountFormat(goal).record(log.amount!):log?.status==='SKIPPED'?'休んだ':'未記録（休みとは別）'}</p>
-            <Button ref={editEntry} disabled={!canEdit} onClick={()=>{setSelected(date);setEditorDraft(null);setEditing(true);}}>この日の記録を編集</Button>
+            {date ? <><h2>{longDate(date)}</h2>
+              <p>{date<goal.recordStartDate?'記録開始前':date>goal.today?'未来の日付':log?.status==='DONE'?'やった '+amountFormat(goal).record(log.amount!):log?.status==='SKIPPED'?'休んだ':'未記録（休みとは別）'}</p></>
+              : <p className="fr-note">カレンダーで日付を選んでください。</p>}
+            <Button ref={editEntry} disabled={!canEdit} onClick={()=>{if(!date)return;setSelected(date);setEditorDraft(null);setEditing(true);}}>この日の記録を編集</Button>
           </section>}
       </div>
     </div>

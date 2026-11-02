@@ -12,6 +12,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const transport = (globalThis as any).__sessionTransport;
 const records: Record<string, Log[]> = { A: [], B: [] };
 let reads = 0, saves = 0;
+let loseResponse = false;
 const goal = (): GoalR11 => ({
   id: 'goal', title: `${transport.owner}-PRIVATE-GOAL`, unit: 'minutes', totalRequired: 1000,
   sessionAmount: 10, initialProgress: 0, progressDone: records[transport.owner]!.reduce((sum, log) => sum + (log.amount ?? 0), 0),
@@ -33,8 +34,10 @@ globalThis.fetch = async (request, init) => {
     const body = JSON.parse(String(init.body));
     const localDate = new URL(url, location.href).pathname.split('/').at(-1)!;
     await new Promise<void>(resolve => { completeSave = resolve; });
-    records[owner] = [{ localDate, status: body.status, amount: body.amount }];
-    return Response.json({ historyRevision: '1', log: records[owner]![0] });
+    const log = { localDate, status: body.status, amount: body.amount };
+    records[owner] = [...records[owner]!.filter(record => record.localDate !== localDate), log].sort((a,b)=>a.localDate.localeCompare(b.localDate));
+    if (loseResponse) throw new TypeError('synthetic response lost after commit');
+    return Response.json({ historyRevision: String(records[owner]!.length), log });
   }
   return sessionFetch(request, init);
 };
@@ -97,6 +100,16 @@ async function run() {
   ensure(!input() && host.querySelector('.fr-history-selection h2')?.textContent?.includes('10月7日'), 'a true URL entry change reused another day draft');
   results.push('a new URL entry chooses its own day and discards the preceding visit draft');
 
+  await click(host.querySelector<HTMLButtonElement>('button[aria-label="前の月"]')!);
+  ensure(host.querySelector('h1')?.textContent?.includes('9月') && !host.querySelector('.fr-history-selection h2')
+    && button('この日の記録を編集').disabled && host.textContent?.includes('日付を選んでください'), 'another month allowed editing today without selecting a date');
+  await recheck();
+  ensure(host.querySelector('h1')?.textContent?.includes('9月') && !host.querySelector('.fr-history-selection h2')
+    && button('この日の記録を編集').disabled, 'same-owner confirmation replaced an empty selection with the URL date');
+  await click(host.querySelector<HTMLButtonElement>('button[aria-label="9月30日 未記録"]')!);
+  ensure(!button('この日の記録を編集').disabled && host.querySelector('.fr-history-selection h2')?.textContent?.includes('9月30日'), 'a selected visible day did not enable the correct date');
+  results.push('a different month requires an explicit visible date before editing');
+
   await click(button('この日の記録を編集')); await amount('20');
   await click(button('記録を保存')); ensure(completeSave && saves === 1, 'save was not held');
   screen = 'readback'; await render();
@@ -106,9 +119,21 @@ async function run() {
   ensure(reads > before && host.querySelector('output')?.textContent === 'A-PRIVATE-GOAL:20', 'confirmed write after leaving history failed to refresh active Goal cache');
   results.push('a confirmed save after unmount refreshes active same-owner Goal/log reads');
 
+  screen = 'history'; entry = '2026-10-05'; await render();
+  await click(button('この日の記録を編集')); await amount('25');
+  loseResponse = true;
+  await click(button('記録を保存')); ensure(saves === 2, 'ambiguous save was not held');
+  screen = 'readback'; await render();
+  ensure(host.querySelector('output')?.textContent === 'A-PRIVATE-GOAL:20', 'ambiguous save readback did not start with old data');
+  const beforeLost = reads;
+  await act(async () => { completeSave!(); await tick(); }); await settle();
+  ensure(reads > beforeLost && host.querySelector('output')?.textContent === 'A-PRIVATE-GOAL:45', 'lost response after commit/unmount left stale Goal data');
+  results.push('a lost response after commit refreshes active same-owner reads without replaying the write');
+  loseResponse = false;
+
   screen = 'history'; entry = '2026-10-06'; await render();
   await click(button('この日の記録を編集')); await amount('30');
-  await click(button('記録を保存')); ensure(saves === 2, 'second save was not held');
+  await click(button('記録を保存')); ensure(saves === 3, 'late successful save was not held');
   transport.owner = 'B'; await recheck();
   screen = 'readback'; await render();
   ensure(host.querySelector('output')?.textContent === 'B-PRIVATE-GOAL:0', 'B did not get fresh own data');
@@ -116,6 +141,18 @@ async function run() {
   await act(async () => { completeSave!(); await tick(); }); await settle();
   ensure(reads === beforeB && host.querySelector('output')?.textContent === 'B-PRIVATE-GOAL:0', 'late A save touched B cache');
   results.push('a late save cannot refresh or render a different owner cache');
+
+  transport.owner = 'A'; await recheck();
+  screen = 'history'; entry = '2026-10-04'; await render();
+  await click(button('この日の記録を編集')); await amount('40');
+  loseResponse = true;
+  await click(button('記録を保存')); ensure(saves === 4, 'late ambiguous save was not held');
+  transport.owner = 'B'; await recheck();
+  screen = 'readback'; await render();
+  const beforeLostB = reads;
+  await act(async () => { completeSave!(); await tick(); }); await settle();
+  ensure(reads === beforeLostB && host.querySelector('output')?.textContent === 'B-PRIVATE-GOAL:0', 'late failed A save touched B cache');
+  results.push('a late failed save cannot refresh or render a different owner cache');
   ensure(transport.writes === 0, 'unexpected transport write');
   await act(async () => root.unmount()); client.clear(); Date.now = realNow;
   return { results, saves, writes: transport.writes };
