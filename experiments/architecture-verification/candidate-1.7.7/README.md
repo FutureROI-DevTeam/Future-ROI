@@ -19,3 +19,5 @@ Linux検証は既存のDocker Desktop Linux engineが使える場合だけ、`no
 Windowsでは `pwsh -NoProfile -File verify-real-engine.ps1 -EngineRoot <参照Engine絶対パス> -PgPort 65392` で、旧predictと公開R-11の7条件を各2回逐次実行する。既存JSONを上書きせず、UTC日時の新規フォルダへ生JSON・ログ・exit code ledgerを保存する。CPU測定中は別のtests/buildを実行しない。
 
 再レビューのURL移植性・公開R11入力境界・diff証拠保存・pool停止後の限界は[2026-10-08の対応報告](../REAL-ENGINE-2026-10-08.md)。候補のhealthはDB疎通のみで、worker poolは死亡後に自動復旧せずprocess再起動まで予測503となる。次回測定するsrc/verifyはcommitまたはstageし、JSONと同じfolderの `*.candidate.diff` を保存する。diff移送の軽量回帰は `pwsh -NoProfile -File verify/diff-evidence.test.ps1`。
+
+2026-11-03の静的配信依存の限定overrideと旧manifest／lockfileの参照は[親README](../README.md#静的配信依存の一時固定2026-11-03)を参照する。Better Auth 1.7.7の比較対象と過去の結果は変更しない。
