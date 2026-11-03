@@ -12,7 +12,7 @@
 | routing | 全pathを同じFunctionへ渡し、既存FastifyのAPI・SPA fallback・assets・Cache-Controlを使用。別のSPA fallbackを追加しない |
 | assets | 最新Web dist全体をFunction内の`apps/web/dist`へコピー。HTML/CSSのローカル参照、全ファイルhash、分離されたWOFF/WOFF2も検査。Vercel entryのWeb rootは生成物内から求め、`WEB_DIST`の外部値やcwdに依存しない |
 | 依存 | root buildにはdev依存もinstallし、Functionには別installでAPIのproduction依存とPredictionのcompiled exportsだけを同梱。コピー前の各distとコピー後のFunctionで`.env*`・`.npmrc`・`.local`、境界外／循環リンクを検査し、開発依存と250 MiB超過も拒否 |
-| DB lifecycle | Vercel entryだけで固定`@vercel/functions@3.9.11`の`attachDatabasePool`をapp/auth双方へ登録。既存pgの上限5/2・型・timeoutを維持。hookはrelease後のidle猶予を`waitUntil`へ登録し、poolを強制終了する処理ではない |
+| DB lifecycle | Vercel entryだけで固定`@vercel/functions@3.10.6`の`attachDatabasePool`をapp/auth双方へ登録。既存pgの上限5/2・型・timeoutを維持。hookはrelease後のidle猶予を`waitUntil`へ登録し、poolを強制終了する処理ではない |
 
 Docker・常駐`server.ts`の起動と終了、migration、認証設定、FEソース、Engine数式はこのTaskの変更対象外。ネイティブFastify検出も公式に存在するが、この候補ではmonorepoの資産・依存を明示するBuild Outputを使う。汎用serverless adapterが必須という判断ではない。
 
