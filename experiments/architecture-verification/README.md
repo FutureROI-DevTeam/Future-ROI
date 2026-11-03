@@ -25,6 +25,12 @@
 - PostgreSQL は `embedded-postgres` が配布する実バイナリをローカルで起動する（検証端末にDockerがなかったため）。データと生成した資格情報は `.local/` に置かれ、Git管理外。
 - Secretの実値は不要。検証スクリプトは実行のたびに乱数で生成する。
 
+## 再実行時の依存更新（2026-11-03）
+
+[PR #327](https://github.com/FutureROI-DevTeam/Future-ROI/pull/327)で、本ディレクトリと`candidate-1.7.7`のSerovalは1.7.7へ更新された。現在の再実行で使うBetter Authも、親環境は1.7.7、隔離候補は1.7.15となっている。実際の版は各manifest／lockfileを参照する。フォルダ名と過去の報告にある1.7.6／1.7.7は当時の比較対象であり、現在の依存でその比較を再現したとは扱わない。既存ソース・報告・raw JSONは保持し、更新後の依存で再検証済みとはしない。説明の同期は[#326](https://github.com/FutureROI-DevTeam/Future-ROI/issues/326)で追跡する。
+
+更新前のlockfileはmain `160c0f81f8e178ae5d405440764b064a5482f0fc`の[親環境](https://github.com/FutureROI-DevTeam/Future-ROI/blob/160c0f81f8e178ae5d405440764b064a5482f0fc/experiments/architecture-verification/package-lock.json)と[隔離候補](https://github.com/FutureROI-DevTeam/Future-ROI/blob/160c0f81f8e178ae5d405440764b064a5482f0fc/experiments/architecture-verification/candidate-1.7.7/package-lock.json)から参照できる。各報告の測定時点を再現する場合は、その報告が指定するcommitとlockfileを使う。今回の検証結果と未確認範囲はIssue／PRに記録する。
+
 ## 再実行
 
 ```bash
