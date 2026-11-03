@@ -266,6 +266,29 @@ function evaluate(condition, outputs) {
   return Function(`return (${js})`)();
 }
 
+test('CD無効でも失敗切替のRe-runは失敗表示にし、通常の停止とは区別する', async () => {
+  for (const [attempts, currentAttempt, failedRetry] of [
+    [{ 1: 'failure' }, 2, true],
+    [{ 1: 'cancelled', 2: 'skipped' }, 3, true],
+    [{ 1: null, 2: undefined }, 3, true],
+    [{ 1: 'failure', 2: 'success' }, 3, false],
+    [{ 1: 'skipped' }, 2, false],
+    [{}, 1, false],
+  ]) {
+    const history = retryHistory(attempts);
+    const api = path => {
+      assert.match(path, /^\/actions\/runs\/99\/attempts\/\d+\/jobs\?per_page=100$/,
+        'CD無効時は自分の切替履歴だけを読み、mainやCIを照合しない');
+      return history(path);
+    };
+    const result = await evaluateCurrentMain({ enabled: false, api, currentRunId: '99', currentAttempt });
+    assert.deepEqual(result, { deploy: false, reason: 'cd-disabled',
+      ...(failedRetry ? { retry_of_failed_switch: 'true' } : {}) });
+    const outputs = Object.fromEntries(Object.entries(result).map(([key, value]) => [key, String(value)]));
+    assert.equal(evaluate(stepCondition('Fail a retry that cannot reach the switch'), outputs), failedRetry);
+  }
+});
+
 test('遮断中と、切替に届かないRe-runはgate jobを失敗にする', () => {
   const blocked = stepCondition('Fail while a previous switch needs review');
   const noop = stepCondition('Fail a retry that cannot reach the switch');

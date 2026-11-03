@@ -113,7 +113,13 @@ async function previousSwitchBlocks(api, currentRunId) {
 }
 
 export async function evaluateCurrentMain({ enabled, api, currentRunId, currentAttempt = 1 }) {
-  if (!enabled) return { deploy: false, reason: 'cd-disabled' };
+  // Even with CD disabled, a no-op retry must not look like recovery. Read only
+  // this run's history before returning; ordinary disabled runs need no API calls.
+  const retry = {};
+  if (currentRunId && currentAttempt > 1 && (await newestSwitch(api, currentRunId, currentAttempt - 1))?.blocked) {
+    retry.retry_of_failed_switch = 'true';
+  }
+  if (!enabled) return { deploy: false, reason: 'cd-disabled', ...retry };
   const mainSha = (await api('/git/ref/heads/main')).object.sha;
   const { workflow_runs: runs } = await api(`/actions/runs?head_sha=${mainSha}&event=push&branch=main&per_page=100`);
   const jobsByRunId = {};
@@ -121,14 +127,9 @@ export async function evaluateCurrentMain({ enabled, api, currentRunId, currentA
     jobsByRunId[run.id] = (await api(`/actions/runs/${run.id}/jobs?filter=latest&per_page=100`)).jobs;
   }
   const blocker = await previousSwitchBlocks(api, currentRunId);
-  const result = { sha: mainSha, ...decideGate({ enabled, targetSha: mainSha, mainSha, runs, jobsByRunId,
+  const result = { sha: mainSha, ...retry, ...decideGate({ enabled, targetSha: mainSha, mainSha, runs, jobsByRunId,
     blockedBySwitch: blocker !== null }) };
   if (blocker) result.blocked_by = `${blocker.run}/attempts/${blocker.attempt}`;
-  // The operator's full retry of a failed-switch run skips its own history above. Only a
-  // successful switch in THIS attempt clears it; flag the retry so a skip is not taken as recovery.
-  if (currentRunId && currentAttempt > 1 && (await newestSwitch(api, currentRunId, currentAttempt - 1))?.blocked) {
-    result.retry_of_failed_switch = 'true';
-  }
   return result;
 }
 

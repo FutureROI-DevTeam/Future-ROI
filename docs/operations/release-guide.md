@@ -500,6 +500,10 @@ Deploy productionが `Production migration (approval required)` で承認待ち�
 | schemaがstopになった | 本番DBが想定外の状態。配備は止まっている。API／DB担当が工程6の表で原因を確認する |
 | 切替・復旧の失敗／取消、runner消失、状態不明 | 後続CDは`previous-switch-needs-review`で停止する。直前の失敗runの候補ID・旧本番ID・Summaryを参照し、担当者がVercelのpending要求の終端と実aliasを照合する。未完了promoteに競合するrollbackや新promoteを重ねない。終端後に必要な手動復旧・smokeを確認する。運用担当の承認後に**元のrun全体**をRe-runしてgateから最新main・CIを再評価する（新runやgate-only成功は遮断を解除しない）。`switch`単体のRe-runは旧snapshotを再利用するため行わない。遮断中のrunはgate jobが失敗表示になり、Summaryに遮断元の`run/attempts/N`を出す。**遮断が解けるのは、そのRe-run自身の`Reconcile production switch`が成功したときだけ**。本番が既に最新mainのSHAだと切替がskipされて解除されないため、そのRe-runは失敗表示になる。この場合は、mainが本番と異なる版になってから同じrun全体を再度Re-runする |
 
+失敗表示の対象には、`CD_ENABLED=false` のまま行う失敗切替runのRe-runも含む。配備は行わず、自分の過去attemptだけを読み取って未解決の切替を識別する。通常のCD無効runや、切替成功後のRe-runはこの理由で失敗にしない。
+
+**古いrunをRe-runするときの制約：** GitHub ActionsのRe-runは、[元のイベントと同じSHA・ref](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)と、[そのイベントに対応するworkflow定義](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflows)を使う。gateのcheckoutは`ref: main`なので判定スクリプトは最新になるが、workflow内の失敗表示stepとjob出力は更新されない。この修正前のrunでは、Re-runが緑でも遮断解除の証拠にならない。必ず当該attemptの`Reconcile production switch`の成功と、その後の新しいCD runのgateを照合する。Re-runできるのは初回実行から30日以内であり、期限超過・旧定義の不適合で回復できない場合はCDを停止したまま別の復旧方法を運用担当が判断する。新runやskipで自動解除されるとは扱わない。
+
 ### 12-E. 未確認
 
 この手順は #275 のPR作成時点で、実際のworkflow実行（Token・Environment・bypassを使う部分、`vercel env pull` で直結URLを取得できるか、promote／rollbackの挙動）を確認していない。初回の有効化で12-B 6の結果を #275 に記録してから確認済みとする。
@@ -509,6 +513,8 @@ Deploy productionが `Production migration (approval required)` で承認待ち�
 PR #276のレビュー修正では[切替回帰](../../.github/scripts/production-switch.test.mjs)のmock CLI／API／時計、[shell回帰](../../.github/scripts/smoke-deployment.test.mjs)のlocalhost HTTP server＋実curl、[gate回帰](../../.github/scripts/deploy-gate.test.mjs)をApplication CIへ追加する。成功、CLI通信断後の遅延完了、取消後の復旧、partial alias失敗、rollback失敗、未知状態、HTTP 200途中停止、古いイベントの待機置換を合成で確認する。通常のGitHub Cancelの実runner実行、Hobby上のAPI終端・直前版rollback、Secret・bypass・DB／メールは未実施で、担当者の承認後に有効化前受入として記録する。長時間のAPI障害・force cancel・runner消失で自動復旧を保証しない。CDの有効化／停止・再実行は担当者の別判断とし、本コード修正では実設定を変更しない。
 
 **2026-10-21〜11-03の無通知停止：** 10-12の[run 38287216046](https://github.com/FutureROI-DevTeam/Future-ROI/actions/runs/38287216046) attempt 1は切替に失敗し（配備用tokenのScope不足による`User not found (404)`）、本番は担当者の手動配備で`f1afce9`になった。10-20のattempt 2は自分のrunを照合から除くため配備可となったが、本番が既に`f1afce9`で切替をskipした。以後の全gateはattempt 2のskipを読み飛ばしてattempt 1の失敗で`previous-switch-needs-review`を返し、#320を含む全マージが本番へ出なかった。runはすべてsuccess表示で、担当者も「遮断は解除された」と誤認した（#275の記録）。対処として、遮断中と切替に届かないRe-runを**失敗表示**にし、遮断元を表示する。skipで遮断を解除する案（本番SHA・`lastAliasRequest`の終端・smokeを確認して解除）は、Vercel状態の照合を新設して安全停止の判定を広げるため採らず、Re-runの切替成功だけを解除条件として維持した。遮断を自動で解除しない性質は変えていない。[回帰](../../.github/scripts/deploy-gate.test.mjs)はskip・gate-only・状態不明のattemptで解除しないこと、Re-runの切替成功後に通ること、遮断・skipしたRe-runの失敗表示を、実workflowの条件と実shellで確認する。
+
+**2026-11-03の復旧報告との区別：** [担当者の記録](https://github.com/FutureROI-DevTeam/Future-ROI/issues/275#issuecomment-6593880547)では、同runのattempt 3でmain `1f9f5df`のmigration・promote・本番SHAとsmokeの照合が成功し、その後のgateで遮断元なしを確認した。上記の停止はこの復旧前の経緯である。この報告は本PRの失敗表示の実Actions受入を示すものではなく、旧workflowのRe-runにも本PRの失敗stepが追加されたとは扱わない。
 
 ## 実施記録のひな形
 
