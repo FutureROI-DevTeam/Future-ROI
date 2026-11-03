@@ -61,6 +61,6 @@ npm run web:build && npm run start:browser   # http://localhost:3220
 
 ## 静的配信依存の一時固定（2026-11-03）
 
-[#329](https://github.com/FutureROI-DevTeam/Future-ROI/issues/329)で、`@fastify/static@10.1.5`配下のglobを14.0.3へ限定overrideした。理由・撤去条件は[root README](../../README.md#静的配信の依存固定)を参照する。本環境と`candidate-1.7.7`それぞれのroot manifestに指定し、現再実行の依存だけを更新する。Better Auth 1.7.6／1.7.7の比較対象と過去の報告・測定・raw JSONは変更しない。
+[#329](https://github.com/FutureROI-DevTeam/Future-ROI/issues/329)で、`@fastify/static@10.1.5`配下のglobを14.0.3へ限定overrideした。理由・撤去条件は[root README](../../README.md#静的配信の依存固定)を参照する。本環境と`candidate-1.7.7`それぞれのroot manifestに指定し、現再実行の依存だけを更新する。現在の認証版はmanifest／lockfileを参照し、元のBetter Auth 1.7.6／1.7.7という過去の比較条件・報告・測定・raw JSONとは区別する。
 
-更新前のmanifest／lockfileはmain `160c0f81f8e178ae5d405440764b064a5482f0fc`の[親環境](https://github.com/FutureROI-DevTeam/Future-ROI/tree/160c0f81f8e178ae5d405440764b064a5482f0fc/experiments/architecture-verification)と[隔離候補](https://github.com/FutureROI-DevTeam/Future-ROI/tree/160c0f81f8e178ae5d405440764b064a5482f0fc/experiments/architecture-verification/candidate-1.7.7)に保持する。測定時点の再現には各報告が指定するcommitと依存を使い、過去結果を新依存で再検証済みとしない。今回の確認範囲・未実施はIssue／PRを参照する。
+glob更新前のmanifest／lockfileはmain `8ab6d89a6c1bdfe3e904b8666ae20f2ae0c2fdf0`の[親環境](https://github.com/FutureROI-DevTeam/Future-ROI/tree/8ab6d89a6c1bdfe3e904b8666ae20f2ae0c2fdf0/experiments/architecture-verification)と[隔離候補](https://github.com/FutureROI-DevTeam/Future-ROI/tree/8ab6d89a6c1bdfe3e904b8666ae20f2ae0c2fdf0/experiments/architecture-verification/candidate-1.7.7)に保持する。測定時点の再現には各報告が指定するcommitと依存を使い、過去結果を新依存で再検証済みとしない。今回の確認範囲・未実施はIssue／PRを参照する。

@@ -20,4 +20,4 @@ Windowsでは `pwsh -NoProfile -File verify-real-engine.ps1 -EngineRoot <参照E
 
 再レビューのURL移植性・公開R11入力境界・diff証拠保存・pool停止後の限界は[2026-10-08の対応報告](../REAL-ENGINE-2026-10-08.md)。候補のhealthはDB疎通のみで、worker poolは死亡後に自動復旧せずprocess再起動まで予測503となる。次回測定するsrc/verifyはcommitまたはstageし、JSONと同じfolderの `*.candidate.diff` を保存する。diff移送の軽量回帰は `pwsh -NoProfile -File verify/diff-evidence.test.ps1`。
 
-2026-11-03の静的配信依存の限定overrideと旧manifest／lockfileの参照は[親README](../README.md#静的配信依存の一時固定2026-11-03)を参照する。Better Auth 1.7.7の比較対象と過去の結果は変更しない。
+2026-11-03の静的配信依存の限定overrideと旧manifest／lockfileの参照は[親README](../README.md#静的配信依存の一時固定2026-11-03)を参照する。現在の認証版はmanifest／lockfileに従い、フォルダ名のBetter Auth 1.7.7は当時の比較対象として扱う。過去の結果は保持する。
