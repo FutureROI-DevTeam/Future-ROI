@@ -18,7 +18,7 @@ summaryは常時出力する。失敗artifactは既存のupload-artifact pinを�
 
 # 本番CDの判定（Issue #275）
 
-- `deploy-gate.mjs`：Deploy productionの判定器。同repoの手動CI完了も起床に使うが、配備許可には最新mainのpush CI成功を要求する。schemaの分類・配備SHAも照合し、Secretや接続値は扱わない。回帰ではworkflowのtrigger・concurrency・gate条件も一緒に検証する。
+- `deploy-gate.mjs`：Deploy productionの判定器。同repoの手動CI完了も起床に使うが、配備許可には最新mainのpush CI成功を要求する。schemaの分類・配備SHAも照合し、Secretや接続値は扱わない。失敗した切替は、Re-run自身の切替が成功するまで後続を遮断し、遮断元の`run/attempts/N`を出す（遮断中と切替に届かないRe-runはworkflowで失敗表示）。回帰ではworkflowのtrigger・concurrency・gate条件も一緒に検証する。
 - `with-production-db.sh`：Vercel Productionの直結URLを実行中だけ取得してmaskし、1コマンドへ`DATABASE_URL`として渡す。
 - `smoke-deployment.sh`：候補・本番URLのhealth・トップ・未認証401を確認する。HTTP要求は接続5秒・転送15秒、smoke全体120秒で打ち切る。途中停止したHTTP 200も失敗にする。
 - `production-switch.mjs`：promote前の開始記録、freshな`lastAliasRequest`の終端・実alias・SHA・smokeの検証と復旧。取消対象の検証と、取消後も続く専用復旧stepを分ける。状態不明ではpending promoteにrollbackを競合させず失敗し、次のgateも遮断する。Rolling Releaseは非対応。

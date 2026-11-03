@@ -86,24 +86,33 @@ export function switchBlocks(jobs) {
   return job && job.conclusion !== 'skipped' ? job.conclusion !== 'success' : null;
 }
 
+// Newest switch result in a run's attempts, from fromAttempt down to 1.
+// A whole-run retry can skip switch (e.g. CI still waiting, or production already
+// runs the SHA). That must not erase an earlier unresolved switch of the same run.
+async function newestSwitch(api, runId, fromAttempt) {
+  for (let attempt = fromAttempt; attempt >= 1; attempt--) {
+    const { jobs } = await api(`/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`);
+    const blocked = switchBlocks(jobs);
+    if (blocked !== null) return { attempt, blocked };
+  }
+  return null;
+}
+
+// The newest switch outside the current run decides. Returns the run/attempt that
+// still needs review, or null.
 async function previousSwitchBlocks(api, currentRunId) {
   for (let page = 1; ; page++) {
     const { workflow_runs: runs } = await api(`/actions/workflows/deploy-production.yml/runs?branch=main&per_page=100&page=${page}`);
     for (const run of runs) {
       if (String(run.id) === currentRunId) continue;
-      // A whole-run retry can skip switch (e.g. CI still waiting). That must not
-      // erase an earlier unresolved switch in the same run's attempt history.
-      for (let attempt = run.run_attempt ?? 1; attempt >= 1; attempt--) {
-        const { jobs } = await api(`/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=100`);
-        const blocked = switchBlocks(jobs);
-        if (blocked !== null) return blocked;
-      }
+      const newest = await newestSwitch(api, run.id, run.run_attempt ?? 1);
+      if (newest) return newest.blocked ? { run: run.id, attempt: newest.attempt } : null;
     }
-    if (runs.length < 100) return false;
+    if (runs.length < 100) return null;
   }
 }
 
-export async function evaluateCurrentMain({ enabled, api, currentRunId }) {
+export async function evaluateCurrentMain({ enabled, api, currentRunId, currentAttempt = 1 }) {
   if (!enabled) return { deploy: false, reason: 'cd-disabled' };
   const mainSha = (await api('/git/ref/heads/main')).object.sha;
   const { workflow_runs: runs } = await api(`/actions/runs?head_sha=${mainSha}&event=push&branch=main&per_page=100`);
@@ -111,8 +120,16 @@ export async function evaluateCurrentMain({ enabled, api, currentRunId }) {
   for (const run of runs.filter(r => Object.hasOwn(REQUIRED_JOBS, r.name) && r.status === 'completed')) {
     jobsByRunId[run.id] = (await api(`/actions/runs/${run.id}/jobs?filter=latest&per_page=100`)).jobs;
   }
-  return { sha: mainSha, ...decideGate({ enabled, targetSha: mainSha, mainSha, runs, jobsByRunId,
-    blockedBySwitch: await previousSwitchBlocks(api, currentRunId) }) };
+  const blocker = await previousSwitchBlocks(api, currentRunId);
+  const result = { sha: mainSha, ...decideGate({ enabled, targetSha: mainSha, mainSha, runs, jobsByRunId,
+    blockedBySwitch: blocker !== null }) };
+  if (blocker) result.blocked_by = `${blocker.run}/attempts/${blocker.attempt}`;
+  // The operator's full retry of a failed-switch run skips its own history above. Only a
+  // successful switch in THIS attempt clears it; flag the retry so a skip is not taken as recovery.
+  if (currentRunId && currentAttempt > 1 && (await newestSwitch(api, currentRunId, currentAttempt - 1))?.blocked) {
+    result.retry_of_failed_switch = 'true';
+  }
+  return result;
 }
 
 function output(values) {
@@ -127,7 +144,8 @@ async function main([mode, ...args]) {
     const enabled = process.env.CD_ENABLED === 'true';
     // workflow_run is a wake-up, not the target. This runs AFTER the workflow lock:
     // if stale A replaces pending B, A still reconciles the current deployable main B.
-    output(await evaluateCurrentMain({ enabled, api: github, currentRunId: process.env.GITHUB_RUN_ID }));
+    output(await evaluateCurrentMain({ enabled, api: github, currentRunId: process.env.GITHUB_RUN_ID,
+      currentAttempt: Number(process.env.GITHUB_RUN_ATTEMPT ?? 1) }));
   } else if (mode === 'head') {
     const mainSha = await mainHead();
     if (mainSha !== targetSha) { output({ head: 'false' }); process.exitCode = 1; return; }
