@@ -2,6 +2,8 @@
 
 Supporting Artifact / Not a Source of Truth。採用済みアプリではない。[追加検証報告](../FOLLOWUP-2026-10-02.md) に結果・制約・設計理由を集約する。親 package は1.7.6の履歴として保持する。
 
+2026-11-03のSerovalパッチ更新と、更新前のlockfile・過去結果の扱いは[親READMEの再実行時の依存更新](../README.md#再実行時の依存更新2026-11-03)を参照する。Better Auth 1.7.7の比較対象は変更しない。
+
 Node 24.21.0 と空の隔離合成 DB を使用し、このディレクトリ内で `npm ci --no-audit --no-fund`、`npm run typecheck`、`npm run web:build`、`npm run verify:auth-db`、`npm run verify:rate-limit`、`npm run verify:fixed` を実行する。Windows では `pwsh -NoProfile -File verify-fixed.ps1` が exit code、JSON FAIL、結果時刻を確認し、所有する合成 DB を終了する。node/npm は親 repo や system を更新しない。Windows実行は既存Chromeを新規隔離profileで使う。`SPIKE_CHROME_PATH`で既存binaryを指定でき、なければブラウザ未検証の INFO とする。ポート3290/3291/3292/3299、PG55591等が空いていることを確認する。他人の process は止めない。
 
 `results/post-fix` は現在の再実行結果。公開した比較の生結果は [日付別結果](../results/2026-10-02/) に保存し、修正前後を上書きしない。試験は2つの合成identityだけで Secret/Cookie/password を出力しない。`.local`、node_modules、生成 env、DB、browser profile を commit しない。

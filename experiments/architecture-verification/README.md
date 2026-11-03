@@ -25,6 +25,12 @@
 - PostgreSQL は `embedded-postgres` が配布する実バイナリをローカルで起動する（検証端末にDockerがなかったため）。データと生成した資格情報は `.local/` に置かれ、Git管理外。
 - Secretの実値は不要。検証スクリプトは実行のたびに乱数で生成する。
 
+## 再実行時の依存更新（2026-11-03）
+
+[#326](https://github.com/FutureROI-DevTeam/Future-ROI/issues/326)で、本ディレクトリと`candidate-1.7.7`のlockfile内Serovalを1.6.8から1.6.11へ更新した。現在の再実行依存の保守であり、Better Auth 1.7.6／1.7.7の比較対象、既存ソース、過去の報告・raw JSONは変更しない。過去結果を更新後の依存で再検証済みとは扱わない。
+
+更新前のlockfileはmain `160c0f81f8e178ae5d405440764b064a5482f0fc`の[親環境](https://github.com/FutureROI-DevTeam/Future-ROI/blob/160c0f81f8e178ae5d405440764b064a5482f0fc/experiments/architecture-verification/package-lock.json)と[隔離候補](https://github.com/FutureROI-DevTeam/Future-ROI/blob/160c0f81f8e178ae5d405440764b064a5482f0fc/experiments/architecture-verification/candidate-1.7.7/package-lock.json)から参照できる。各報告の測定時点を再現する場合は、その報告が指定するcommitとlockfileを使う。今回の検証結果と未確認範囲はIssue／PRに記録する。
+
 ## 再実行
 
 ```bash
