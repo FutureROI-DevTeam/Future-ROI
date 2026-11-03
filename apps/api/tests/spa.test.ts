@@ -12,6 +12,9 @@ async function appWithSpa(t: test.TestContext) {
   mkdirSync(join(webDist, 'assets'));
   writeFileSync(join(webDist, 'index.html'), '<!doctype html><title>spa</title>');
   writeFileSync(join(webDist, 'assets', 'app-abc123.js'), 'console.log(1)');
+  mkdirSync(join(webDist, 'assets', 'nested'));
+  writeFileSync(join(webDist, 'assets', 'nested', '資料-[v1].txt'), 'nested asset');
+  writeFileSync(join(webDist, 'assets', 'nested', '.private.txt'), 'must stay private');
   const pool = new pg.Pool({ connectionString: 'postgres://nobody:nothing@127.0.0.1:1/none' });
   const app = await buildApp({ pool, webDist, logger: false });
   t.after(async () => {
@@ -38,6 +41,22 @@ test('hash付きassetsは長期キャッシュできる', async (t) => {
   const res = await app.inject({ method: 'GET', url: '/assets/app-abc123.js' });
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['cache-control'], 'public, max-age=31536000, immutable');
+});
+
+test('静的配信は入れ子・Unicode・記号を含むassetを列挙し、dotfileを公開しない', async (t) => {
+  const app = await appWithSpa(t);
+  const url = `/assets/nested/${encodeURIComponent('資料-[v1].txt')}`;
+  const res = await app.inject({ method: 'GET', url });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body, 'nested asset');
+  assert.equal(res.headers['cache-control'], 'public, max-age=31536000, immutable');
+  const head = await app.inject({ method: 'HEAD', url });
+  assert.equal(head.statusCode, 200);
+  assert.equal(head.body, '');
+  assert.equal(head.headers['content-length'], String(Buffer.byteLength('nested asset')));
+  const hidden = await app.inject({ method: 'GET', url: '/assets/nested/.private.txt' });
+  assert.equal(hidden.statusCode, 404);
+  assert.deepEqual(hidden.json(), { error: { code: 'NOT_FOUND', message: 'No such route.' } });
 });
 
 test('存在しないAPI、対象外のmethod、拡張子付きの未知ファイルにはHTMLを返さない', async (t) => {

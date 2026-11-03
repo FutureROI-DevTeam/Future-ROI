@@ -13,6 +13,11 @@
     "apps/api",
     "apps/web"
   ],
+  "overrides": {
+    "@fastify/static@10.1.5": {
+      "glob": "14.0.3"
+    }
+  },
   "scripts": {
     "build:prediction": "npm run build --workspace=@futureroi/prediction",
     "dev:api": "npm run build:prediction && npm run dev --workspace=@futureroi/api",

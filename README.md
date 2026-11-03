@@ -76,6 +76,12 @@ API テストはテスト用 PostgreSQL を使用します。shell の `DATABASE
 
 `typecheck`は公開型とアプリの型、`test`はEngineの独立オラクル・APIの保存境界・Webの純粋変換と描画、`build`は配信成果物を確認します。`verify:ci-reports`はCIの集計・失敗判定・診断情報の保存範囲を検査します。各層の保証と実ブラウザの範囲は[検証手順](docs/DEVELOPMENT_GUIDE.md#検証)を参照してください。
 
+### 静的配信の依存固定
+
+[#329](https://github.com/FutureROI-DevTeam/Future-ROI/issues/329)で、`@fastify/static@10.1.5`配下だけの`glob`を14.0.3へ一時固定しています。親の通常更新では届かないglob／minimatchの脆弱性に対応するnpm overrideで、他の親の依存へは適用しません。npmは各project rootのoverrideだけを読むため、独立した旧検証2環境にも同じ指定があります。
+
+親が修正版globを許容する版を公開したら、その更新で既存の静的配信・assets・SPA／API境界と対象アラートの解消を確認してoverrideを撤去します。親の版を変える際も固定条件を再評価してください。過去の検証依存と現再実行の区別は[実験README](experiments/architecture-verification/README.md#静的配信依存の一時固定2026-11-03)を参照します。
+
 ### 開発基盤のセットアップと確認
 
 文書・リンクと図の検査は PowerShell 7 で実行できます。
