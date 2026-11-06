@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const jobLayers = {
-  application: ['install', 'diagnostic-tests', 'typecheck', 'test', 'build', 'migration-tests', 'migrate'],
+  application: ['install', 'diagnostic-tests', 'typecheck', 'test', 'build', 'browser-e2e', 'migration-tests', 'migrate'],
   container: ['compose-config', 'smoke-script-tests', 'container-build', 'container-smoke', 'compose-smoke'],
   foundation: ['foundation'],
 };
@@ -164,7 +164,7 @@ async function runLayer(layer, command, args) {
   mkdirSync(directory, { recursive: true });
   const start = performance.now();
   const workspaceMode = layer === 'test';
-  const nodeTests = workspaceMode || ['diagnostic-tests', 'migration-tests'].includes(layer);
+  const nodeTests = workspaceMode || ['diagnostic-tests', 'migration-tests', 'browser-e2e'].includes(layer);
   let output = '';
   // Both console streams remain visible in the job log. Only numeric summaries are retained.
   const child = spawn(command, args, { stdio: ['inherit', 'pipe', 'pipe'] });

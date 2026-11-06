@@ -64,11 +64,13 @@ test('spawn失敗と不完全なtest出力も失敗記録を残す', async () =>
   for (const [layer, command, args, diagnostic] of [
     ['build', '__ci_command_does_not_exist__', [], 'spawn-failure'],
     ['migration-tests', process.execPath, ['-e', 'console.log("# tests 0")'], 'count-gate'],
+    ['browser-e2e', process.execPath, ['-e', 'console.log("# tests 0")'], 'count-gate'],
+    ['browser-e2e', process.execPath, ['-e', 'console.log(' + JSON.stringify(totals(counters(2, 1))) + ')'], 'count-gate'],
   ]) {
     const directory = mkdtempSync(join(tmpdir(), 'ci-report-test-'));
     try {
       await assert.rejects(promisify(execFile)(process.execPath, [script, 'run', layer, '--', command, ...args],
-        { env: { ...process.env, CI_REPORT_DIR: directory }, windowsHide: true }));
+        { env: { ...process.env, CI_REPORT_DIR: directory, GITHUB_ACTIONS: 'true' }, windowsHide: true }));
       assert.equal(JSON.parse(readFileSync(join(directory, layer + '.json'), 'utf8')).diagnostic, diagnostic);
     } finally {
       for (const path of readdirSync(directory)) rmSync(join(directory, path));

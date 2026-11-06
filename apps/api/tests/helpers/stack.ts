@@ -101,6 +101,8 @@ export class Client {
 export type Stack = { app: FastifyInstance; auth: ReturnType<typeof createAuth>; close: () => Promise<void>; mails: MailMessage[]; settle: () => Promise<void> };
 export type StackOptions = {
   baseURL?: string;
+  /** 実HTTP/browser検証で、製品のビルド済みSPAを同じoriginから配信する。 */
+  webDist?: string;
   signInMax?: number;
   resetMax?: number;
   passwordResetEnabled?: boolean;
@@ -144,6 +146,7 @@ export async function startStack(
     });
     app = await deps.buildApp({
       pool: db.pool,
+      ...(o.webDist ? { webDist: o.webDist } : {}),
       ...(o.logStream ? { logStream: o.logStream } : { logger: false }),
       auth: { instance: auth, baseURL, allowedOrigins: [baseURL], trustProxyHops: o.trustProxyHops ?? 0 },
       ...(o.now ? { now: o.now } : {}),
