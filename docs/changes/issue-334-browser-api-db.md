@@ -68,15 +68,25 @@ GitHub MCPに保護設定取得の機能がないため、読み取り専用`gh 
 
 実行環境はWindows、Node 24.22.1、npm 11.19.0。初回の依存導入はPATHの既存npmがNode 22を使ったため、正しいNode/npmで`npm ci --ignore-scripts --no-audit --no-fund`を再実行した。依存/lockfile変更なし。型検査・全workspace buildは成功し、既存の500kB chunk警告は残った。
 
-追加E2Eは最終差分で3回連続成功（各回4/4、親test＋3導線、失敗・取消・skip・todo 0）。process wallは26.225秒、23.383秒、22.709秒（中央値23.383秒）。既存APIテストと同時実行した開発端末の測定であり、無負荷benchmarkではない。各回で新しいDB/profileを使い、cleanup成功。自動再試行なし。
+初回push `fcda8f4` の追加E2Eはローカルで3回連続成功（各回4/4、親test＋3導線、失敗・取消・skip・todo 0）。process wallは26.225秒、23.383秒、22.709秒（中央値23.383秒）。ただし、次のLinux CIで待機条件の欠陥を検出したため、この反復を最終修正の安定性の証拠にはしない。
 
-初期試行の失敗はテスト側のUI期待値（時間/分の整形、ChoiceButtonの不可視区切り文字）とDELETEの余分なJSON Content-Typeだった。表示契約と実HTTPに合わせてテストを訂正し、製品のassertion・実装は弱めていない。修正前の失敗を最終3回の成功に混ぜない。最終反復前にも全導線4/4成功を確認した。
+初期試行の失敗はテスト側のUI期待値（時間/分の整形、ChoiceButtonの不可視区切り文字）とDELETEの余分なJSON Content-Typeだった。表示契約と実HTTPに合わせてテストを訂正し、製品のassertion・実装は弱めていない。
 
-型検査・全workspace build成功、CI集計/配備gate/DB接続先ガード30/30成功。CI skip拒否を追加後の集計回帰6/6成功。Foundationは123文書等・2851相対リンク、差分空白を確認した。既存全workspace回帰は各testごとのembedded起動に時間が掛かるため一度中断し、同じ隔離helperで作成した専用クラスタを共有する実行へ切り替えた。中断分を成功として数えない。
+初回[Application CI](https://github.com/FutureROI-DevTeam/Future-ROI/actions/runs/42289448182)では、既存R11 32/32・Engine 77/77・API 317/317・Web 230/230が成功し、新E2Eの3導線目が登録email入力待ちで失敗した。E2E stepは約20秒。実session応答を保留する調査用プローブで、URLは`/register`でも旧ログイン欄が残り、フォーカス後のフォーム置換で入力先を失う欠陥を再現した。元CIにDOM記録はなく、同じ失敗を起こすdriver欠陥の再現である。製品不具合と断定しない。
+
+修正はURLだけでなく目的の認証見出し・active tab・password autocompleteの描画を待つもの。timeout延長・自動再試行なし。修正後の同じ応答遅延では、旧画面に入力せず描画後に全4件が成功（26.303秒）。入力失敗時の診断も固定field名と真偽値だけとし、入力値・Cookie・DOM本文を出さない。
+
+修正後の通常E2Eは3回連続成功（各4/4、失敗・取消・skip・todo 0、再試行なし）。Node test durationは22.075秒、22.159秒、16.262秒（中央値22.075秒）。後2回のprocess wallは22.264秒、16.321秒。各回の新規DB/profileはcleanup成功。既存APIテストと重なる開発端末の測定であり、無負荷benchmarkでも長期flake率の推定でもない。実session応答を保留した対照実験と合わせて、URL先行時の待機条件を確認した。
+
+型検査・全workspace build成功、CI集計/配備gate/DB接続先ガード30/30成功。CI skip拒否を追加後の集計回帰6/6成功。Foundationは123文書等・2851相対リンク、差分空白を確認した。ローカルの既存全workspace回帰はembedded起動の所要時間のため一度中断。次に専用クラスタを共有した一括実行はR11 32/32・Engine 77/77・Web 230/230が成功したが、APIは308成功・1失敗だった。既存Milestone安全策が固定CI接続先以外の`DATABASE_URL`を拒否したためで、検証用実行方法の不適合である。安全策は変更しない。この中断・失敗した一括実行を成功として数えない。
+
+該当Milestoneは`DATABASE_URL`・`GITHUB_ACTIONS`を外し、新規embeddedクラスタを使う既存の正規入口で個別実行して9/9成功（113.496秒、skip/取消0）。元の一括実行とは別結果として扱う。認証待機修正後の集計/配備gate/DB接続先ガードも30/30成功した。
 
 独立レビューでは、他人のGoal確認がloading中に成功し得る判定と、Chrome停止未確認でのprofile削除を指摘され修正した。同一SPA内のA logout→B登録、数値のDOM反映も強化。最終確認で未解決Blocking/Should Fixなし。Human Reviewの代替ではない。
 
-既存全回帰・GitHub CIの最終結果は実行完了後にIssue/PRへ記録する。未実行は成功扱いにしない。
+認証待機修正も別担当がコードと対照プローブを独立レビューし、native入力・同一SPA切替・既存assertion・時間上限が保たれ、未解決Blocking/Should Fixがないことを確認した。
+
+修正後のGitHub CI・同一SHAの最終結果と所要時間は[PR #335](https://github.com/FutureROI-DevTeam/Future-ROI/pull/335)へ記録する。未実行は成功扱いにしない。
 
 ## 残る受入
 

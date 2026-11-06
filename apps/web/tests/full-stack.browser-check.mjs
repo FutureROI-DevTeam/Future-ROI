@@ -111,7 +111,17 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
     await until(`(${visible})(${element(selector)})`, 'input available');
     await evaluate(`(() => {const e=${element(selector)};e.focus();e.select();})()`);
     await cdp.send('Input.insertText', { text: String(value) });
-    await until(`${element(selector)}?.value === ${JSON.stringify(String(value))}`, 'native input applied');
+    try {
+      await until(`${element(selector)}?.value === ${JSON.stringify(String(value))}`, 'native input applied');
+    } catch (error) {
+      // Only fixed field identifiers and booleans: never input values, credentials or DOM text.
+      const state = await evaluate(`(() => {const e=${element(selector)};return {
+        present:!!e,focused:!!e && document.activeElement===e,disabled:e?.disabled===true,
+        loginForm:document.querySelector('#auth-title')?.textContent==='ログイン',
+        registerForm:document.querySelector('#auth-title')?.textContent==='新規登録'};})()`);
+      t.diagnostic(JSON.stringify({ inputState: { field: selector, ...state } }));
+      throw error;
+    }
   };
   const navigate = async path => {
     await cdp.send('Page.navigate', { url: origin + path });
@@ -131,6 +141,15 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
       await click(element('.fr-auth__seg a[href^="/register"]'), 'in-app register tab');
       await until('location.pathname === "/register"', 'register route');
     } else if (path !== '/' + mode) await navigate('/' + mode);
+    // History can show /register while async beforeLoad still retains the login form.
+    // Both forms use the same field IDs; wait for the requested form's actual commit.
+    const title = mode === 'register' ? '新規登録' : 'ログイン';
+    const autocomplete = mode === 'register' ? 'new-password' : 'current-password';
+    const authFormReady = `location.pathname === ${JSON.stringify('/' + mode)}
+      && document.querySelector('#auth-title')?.textContent === ${JSON.stringify(title)}
+      && !!document.querySelector('.fr-auth__seg a[aria-current="page"][href^="/${mode}"]')
+      && document.querySelector('#auth-password')?.autocomplete === ${JSON.stringify(autocomplete)}`;
+    await until(authFormReady, 'committed auth form');
     await input('#auth-email', account.email);
     await input('#auth-password', account.password);
     await click(element('.fr-auth__form button[type="submit"]'), 'auth submit');
