@@ -7,7 +7,8 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-// Application / Foundation の必須job名（required check名と同じ）。名前を変えたらここも更新する。
+// CDが要求するApplication / Foundationのjob名。GitHubのmain保護設定は別途確認する。
+// 名前を変えたらここも更新する。
 export const REQUIRED_JOBS = Object.freeze({
   Application: ['Production install and Vercel bundle smoke', 'Install, typecheck, test, build', 'Container build and smoke test'],
   Foundation: ['Repository checks'],

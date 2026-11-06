@@ -10,6 +10,12 @@
 
 公開先は2026-10-08の依頼者方針により、**本人アカウント・厳密0円でFE／BEともVercel Hobby、DBはNeon Free、ローカルはDocker**を第一候補にしています。[D-25](../architecture.md#d-25)の非商用・無料枠・共有制限と[採用前の最小検証](release-demo.md#公開候補の採用前に行う最小検証)を#83で追跡します。採用確定・デプロイ済みではなく、Cloud Runの旧候補はD-25に保持します。
 
+## main保護の確認（2026-11-07 JST）
+
+`FutureROI-DevTeam/Future-ROI`のmain `ff954f9aebc1c3194e4a3000331ffc30e03fc9ed`で、GitHub APIは`protected:false`、branch protectionは404、repository rulesetsとmainへ適用されるrulesは空配列を返した。したがって、この時点では必須CI・PR・履歴保護をGitHubが強制していない。[条件付きセルフマージ](../../CONTRIBUTING.md#条件付きセルフマージ2026-10-11)の承認数一時解除と区別する。CIの存在や[配備gate](../../.github/scripts/deploy-gate.mjs)はmainの事前保護を保証しない。
+
+設定変更は未実施。PR必須・force push/削除禁止と、既存Applicationの3jobおよびFoundationの`Repository checks`の必須化を推奨する。承認1件を復帰するかはチーム判断。確認方法・実測・制約は[Issue #334の記録](../changes/issue-334-browser-api-db.md)を参照し、実設定は変更し得るためmerge判断時に再確認する。
+
 ## 現在の未決定事項
 
 - 認証／公開先の最終受入・検証・運用条件（[D-24](../architecture.md#d-24)／[D-25](../architecture.md#d-25)）。Runtime・runner・migration方式は[#70/#74の記録](../architecture.md#2026-10-06の版固定と起動構成)で固定済み。ローカルのDB migration・認証は実装済みで、[Docker一式起動](../DEVELOPMENT_GUIDE.md#dockerで一式を起動する)は#130で補完する。

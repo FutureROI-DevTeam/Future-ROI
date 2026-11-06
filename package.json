@@ -24,6 +24,7 @@
     "dev:web": "npm run dev --workspace=@futureroi/web",
     "typecheck": "npm run build:prediction && npm run typecheck --workspaces",
     "test": "npm run build:prediction && npm run verify:r11 && npm run test --workspaces --if-present",
+    "test:e2e": "node --test --test-concurrency=1 apps/web/tests/full-stack.browser-check.mjs",
     "build": "npm run build --workspaces --if-present",
     "build:vercel": "npm run build && node scripts/build-vercel.mjs",
     "verify:vercel": "node --test apps/api/tests/vercel.test.ts scripts/tests/vercel-bundle.test.mjs",
