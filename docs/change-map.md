@@ -60,6 +60,8 @@ FEの「整合snapshot」は別GET間の日付・設定・回答版・累計・�
 - **数値核**：`recovery.ts`はBigIntの整数比で50%／80%境界（等号を含む）を比較する。[completion.ts](../packages/prediction/src/completion.ts)のDP（動的計画法）はDONE回数・直前状態から初到達確率を運ぶ。到達不能状態だけを刈り込み、微小確率は捨てず、Hより先の質量を除いて再正規化しない。[recovery.test.mjs](../packages/prediction/tests/recovery.test.mjs)・[completion.test.mjs](../packages/prediction/tests/completion.test.mjs)・[completion-deadline.test.mjs](../packages/prediction/tests/completion-deadline.test.mjs)と[計算正本](architecture.md#prediction-engine)を先に確認する。
 - **保存と表示の境界**：[record-log.test.mjs](../apps/web/tests/record-log.test.mjs)・[today-data.test.mjs](../apps/web/tests/today-data.test.mjs)・[today-presentation.test.mjs](../apps/web/tests/today-presentation.test.mjs)。409は[goal-form.test.mjs](../apps/web/tests/goal-form.test.mjs)と[question-prior-http.test.ts](../apps/api/tests/question-prior-http.test.ts)。実行の前提・コマンドは[アプリの検証手順](DEVELOPMENT_GUIDE.md#アプリを起動検証する)・[Engineの検証手順](../packages/prediction/README.md#ローカル検証)に集約する。文書変更には[Foundation](../README.md#開発基盤のセットアップと確認)を使う。
 
+- **画面から保存先までの接続**：[継続E2E](../apps/web/tests/full-stack.browser-check.mjs)が実SPA→認証Cookie→HTTP→PostgreSQL→再表示、作成再送・設定競合・owner隔離を検査する。[接続先ガード](../apps/web/tests/e2e-database.mjs)と[その回帰](../apps/web/tests/e2e-database.test.mjs)で本番用環境値の継承を拒否する。実行方法・合成HTTP回帰との分担は[検証手順](DEVELOPMENT_GUIDE.md#検証)を参照。
+
 ### 読解チェック（実人試験は未実施）
 
 [#274の走査記録](changes/issue-274-readability-audit.md)に、今回確認した全対象と、変更・保持の判断を残す。

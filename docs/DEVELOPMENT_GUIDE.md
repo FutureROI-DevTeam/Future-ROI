@@ -593,6 +593,12 @@ Webの[所有者境界の実hook回帰](../apps/web/tests/session-cache.browser-
 
 sessionの再確認中は私的な画面・入力をDOMから除き、query cacheも消します。再確認が通信の失敗やAPIの5xxで終わった場合は、各画面は読み込み中のままにし、ログイン後の外枠（AppShell）が「接続できませんでした」と再読み込みのボタンを1か所で出します。再読み込みはsessionの再取得からやり直し、未ログインと取り違えてログイン画面へは送りません（#279）。ただしTodayは、表示していた人と同じsessionの正常な再確認の間は画面を作り直さず、入力中の量を保ちます。確認中に届いた応答は使わず、その間に押した保存は「保存中」として預かり、同じ人と確定してから1回だけ送ります（[D-30](architecture.md#d-30-todayの同一owner再確認で入力を保つ190)）。失敗・logout・別owner・認証変更通知を挟まない正常な同一owner確認だけ、画面内のメモリから未送信入力と履歴の選択月を復帰します。別route／Goalへの離脱で持ち越しません。編集の最新値・revision・記録の有無が変わった場合は復元せず、最新Goalを表示した理由を知らせます。保存・削除・回復中の状態や結果不明の作成attemptは、このdraftとは別に扱います。確定した保存成功だけは送信時owner/連続性世代/ページの訪問トークンに束縛して親へ伝え、正常同一owner確認後に一覧へ一度だけ移します。異なるpathへの遷移開始で旧訪問を失効させ、Goal1→Goal2→Goal1でも旧成功を戻った画面へ作用させません。同path/searchの再確認は訪問を保ちます。owner変更・失敗・実ページ離脱では旧成功を新画面へ作用させません。契約検査の422 VALIDATION_ERRORは、訂正開始時だけ未送信draftへ戻します。訂正前・通信結果不明・500・409・削除失敗は通常snapshot復帰の対象外です。可視状態へ戻るイベントとonlineが自動再確認を起こします（同じ自動経路の5秒抑制あり）。window focusだけでは起こらず、同pathへのroute確認にはこの抑制がありません。route確認ごとに共有Goal cacheをresetし、inactive queryも次のmountで取り直すため、画面遷移の通信量・体感遅延には影響します。公開先での性能とチーム受入は未承認で、実ユーザーでの頻度・UX受入も別途残ります。詳しい境界は[Architectureの認証実装](architecture.md#2026-10-06の認証実装75)を参照してください。
 
+実SPAから実HTTP認証・API・PostgreSQLまでの通し確認は、リポジトリrootで`npm run build`の後に`npm run test:e2e`を実行します。[継続E2E](../apps/web/tests/full-stack.browser-check.mjs)は既存のChrome起動helperとAPIテスト用stackを使い、作成・記録・Today・再読込、確定後に作成応答を失った場合の明示再送、設定競合、ログアウト・別ownerの拒否を確認します。DOM操作と実API/DBの検査を併用し、通常の通信は合成しません。新しいテストライブラリは不要で、ブラウザ探索は上記と同じです。既存の合成HTTP回帰は引き続き実行します。
+
+このE2Eは`.env`を読まず、未指定なら新規embedded PostgreSQLクラスタ・専用databaseを作ります。アプリ用`DATABASE_URL`がシェルに残っていれば接続前に失敗するため、環境値を引き継がない検証用シェルで実行してください。CIだけは`E2E_DATABASE_URL`に[workflow](../.github/workflows/application.yml)の専用PostgreSQL service接続を明示します。[接続先ガード](../apps/web/tests/e2e-database.mjs)はその固定された合成credential・host・port・DB以外を拒否します。接続先を本番へ差し替えたり、ガードを外したりしません。獲得したブラウザ・API・poolを閉じ、自分で作成したdatabaseだけを削除します。embeddedクラスタのファイルは既存helperの方針でGit除外の`apps/api/.local/`に残ります。
+
+[Application CI](../.github/workflows/application.yml)はbuild直後にE2Eを実行し、既存集計の`browser-e2e`層へ件数・所要時間を出します。0件・skip・未完了はCI失敗です。テスト全体の自動再試行で失敗を隠しません。故障注入は実POSTが確定した後の応答遮断に限定し、設定競合は実APIで発生させます。ドメインの日付を開始時刻に固定するため日跨ぎは既存API/ブラウザ回帰へ分担します。結果・対象外・計測条件は[Issue #334の記録](changes/issue-334-browser-api-db.md)を参照し、ローカルの通過を公開環境・Safari・人間の理解・予測精度の受入にしません。
+
 `.env`は`npm run dev:api`とmigration／seedのCLIが読みます。`npm test`とビルド済みサーバーはシェルの環境変数だけを見るため、次のように使い分けます。
 
 | 用途 | sh（macOS / Linux / Git Bash） | PowerShell |
