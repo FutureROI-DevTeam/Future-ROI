@@ -85,7 +85,8 @@ export function runOne(directory, batchId, proposal) {
   const baseline = git(['show', `${base}:${candidatePath}`]) + '\n';
   // Known prerequisites fail before reservation. Uncertain create results still occupy a slot.
   command('docker', ['info', '--format', '{{.ServerVersion}}']);
-  command('docker', ['image', 'inspect', image]);
+  // Docker may store a tag pull only as repository@digest, without the tag@digest alias.
+  command('docker', ['image', 'inspect', 'node@' + image.split('@')[1]]);
   const attempt = transaction(directory, s => {
     reserve(s, id, name);
     return { number: s.tasks[id].attempts, ms: s.batches[batchId].contract.attemptMs, startedAt: s.tasks[id].active.startedAt };

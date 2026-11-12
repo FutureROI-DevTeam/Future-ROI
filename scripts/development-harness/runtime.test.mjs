@@ -59,7 +59,7 @@ test('実Docker: 誤実装・偽TAP成功を拒否し、同じ台帳で修復後
 test('実Docker: worker生存中の取消では枠を解放せず、runtime停止確認後に復旧', () => {
   const { directory, c, id } = setup();
   const name = 'roi-harness-stop-' + Date.now();
-  command('docker', ['create', '--name', name, '--label', `future-roi-harness=${name}`, '--network', 'none',
+  command('docker', ['create', '--pull', 'never', '--name', name, '--label', `future-roi-harness=${name}`, '--network', 'none',
     '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', '1000:1000', image,
     'node', '-e', 'setTimeout(()=>{},30000)']);
   command('docker', ['start', name]);
