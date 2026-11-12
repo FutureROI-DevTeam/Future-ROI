@@ -1,5 +1,15 @@
 # #340 開発ハーネスの実装・検証記録
 
+## 実Codex接続の追加契約
+
+依頼者の続行指示で、前段のfixture-onlyを完成とせず、既存購読認証のCodex 0.151.0を構造化差分生成に接続する。対象は #340 の検証fixture。backlogの未決製品仕様や実人確認へ許可を広げない。変更対象はworker adapter・台帳・CLI・回帰・運用文書。
+
+受入は実モデル生成→固定パス検査→無認証Docker→既存ci-report→候補commit/patch/Draft本文。モデル終了未確認は枠を保持し、初回＋修復3回・モデル呼出し予約4回・attempt 300秒・task/batch 1200秒・有効期間1時間・新規課金0を同じ台帳に保持する。費用総額はnull。失敗修復だけを自動再試行し、レビュー待ちheadは必須修正入力まで固定する。
+
+比較: AWは前段の版/認証適合未確認を残し、新しい基盤を追加しない。既存Codex CLIのツールを固定catalog/configで除去する小さいadapterを選ぶ。shell無効のみ、自然文の禁止、認証付きcandidate containerは要件を満たさない。
+
+事前反証で、shell停止後のapply_patch/子agent残存、global AGENTS自動読込み、CLI内部retry、auth hardlink経由の原本書換えを確認した。fake ChatGPT providerで公開tool 0と未広告shell/patch/image/agentの拒否を検査する。専用ホームには既存access tokenだけを一時複写し、refresh token・設定・Skills・メモリを渡さない。期限切れは新認証を作らず停止する。候補コードは一切そのホームで実行しない。
+
 ## 実装前の契約と反証計画
 
 基準mainは `7beba614697ecc3098cde122e2f0305842962812`。2026-11-12の依頼に限定したローカル比較試行であり、製品仕様・AW・無人運用の正式採択ではない。
@@ -67,6 +77,22 @@
 
 review-gateの対象はIssue #340、契約・権限・状態・固定検査・回帰・文書同期。製品UIを変更していないため全画面・全端末・実利用者試験は追加しない。Product Specの意味・保存/再送・owner・初期質問は変更不要。新しい操作・予算・復旧は運用文書、限定比較の位置付けはArchitecture D-36、入口はREADME/AIツールガイド/変更対応表へ同期した。
 
-残る実接続は[設定差分](../operations/development-harness.md#実接続へ進む前の設定差分)のとおり。AW固定版compile/lock、実モデルworker、実Issue/既存branch/PR照合、publisher、PR後CIの取得は未実装・未検証。ローカルfixture専用の入口を汎用開発workerと呼ばない。実Issueを完了扱いにせず、Issue #340もOpenのままとする。
+前段の `f08a74d` 時点では、AW固定版compile/lock、実モデルworker、実Issue/既存branch/PR照合、publisher、PR後CIの取得は未実装・未検証だった。続行での実モデル接続は下記に別記する。現在の残項目は[設定差分](../operations/development-harness.md#実接続へ進む前の設定差分)を参照する。fixture限定を汎用開発workerと呼ばず、実Issueを完了扱いにしない。
 
 人の導入・操作・レビュー・復旧時間、受入価値、総費用、実運用の誤完了率は未計測（null）。新規モデル課金呼出し0という性質と、総費用が0円という主張を区別する。基盤が人の負担を減らすという効果はまだ主張できない。
+
+## 続行の診断・修正・再確認
+
+レビュー対象は `e600f285` に対するCodex接続差分。実装担当はportable状態12＋Codex4、実CLI偽認証/停止復旧4、Docker6、既存ci-report6を実行し、いずれもfail/skip 0。Foundationも成功。最初のDocker再試験はimage参照形式の不一致で3件失敗し、固定digestを維持したままtag@digest/名称@digestの照合を修正した後6/6成功。失敗を成功集計へ含めない。
+
+別コンテキストreviewerは元コードと差分を読み、状態/Codex16件と実CLI偽認証/実process4件を独立実行した。実tokenをreviewerへ渡さず、本番攻撃・本番データ・人の模擬回答は使っていない。
+
+| ID・重大度・箇所 | 成立条件・影響・既存防御の不足 | 最小修正・再確認の証拠 | 状態・残る未確認 |
+| --- | --- | --- | --- |
+| CR-01 Blocking / codex-worker readQuota・runtime recover | quota子の未登録、または古いsnapshot後に推論子が登録された状態で復旧すると、親停止だけで枠を空け得た。既存Docker確認では認証processを追えない | probe/quota/liveのPID/開始時刻/pathを記録。owner停止後に最新台帳を再読し最新子の停止を確認。無害な実processを使うsnapshot切替回帰を実装者・reviewer双方で成功 | 再確認済み。実tokenの異常停止は未注入 |
+| CR-02 Blocking / generateProposal・invoke | 取消済みでもquota後に推論を開始する窓、cancel判定例外でtimer前にrejectし子が残る経路。後者をreviewerが無害Nodeで生存再現 | 開始transactionで取消/所有/期限を確認。stdin送信直前も確認し例外ならkill→close待ち。既取消でprobe開始なし、判定throw後PID不存在の回帰成功 | 再確認済み |
+| CR-03 Should Fix / state・契約 | modelCallsは実HTTP推論回数ではなくCLI起動予約だった。mock自体が2 requestsであり、誤った費用上限説明になる | maxModelRuns/modelRunsへ変更。HTTP/stream retry0と時間上限、request数未計測を文書化 | 再確認済み。総費用・実request数はnull相当の未計測 |
+
+事前診断のglobal AGENTS読込みとauth hardlink原本更新は固定版ソースで確認し、隔離ホーム＋ACL確認後のaccess/idのみ複写へ変更した。hardlink案は利用枠read-only確認後に破棄・unlink済み。最終adapterは原本を変更しない。CLIの構成は[公式設定リファレンス](https://learn.chatgpt.com/docs/config-file/config-reference)と固定版ソース、実native probeを照合した。最新版のToolPolicy APIを固定0.151.0で使えるとは仮定しない。
+
+実認証によるモデル生成の結果は、確定した実行SHAと候補SHA・台帳に基づき追記する。ここまでのmock成功を実モデル成功へ昇格させない。

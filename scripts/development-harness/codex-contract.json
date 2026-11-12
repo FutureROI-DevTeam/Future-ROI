@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "repository": "FutureROI-DevTeam/Future-ROI",
+  "batchId": "codex-comparison-1",
+  "mode": "codex-fixture",
+  "publish": false,
+  "workers": 1,
+  "reviewLimit": 1,
+  "maxRepairs": 3,
+  "attemptMs": 300000,
+  "taskMs": 1200000,
+  "batchMs": 1200000,
+  "lifetimeMs": 3600000,
+  "maxCostCents": 0,
+  "tasks": [
+    {
+      "id": "fixture-issue-340",
+      "revision": 1,
+      "purpose": "無害な整数加算fixtureの誤実装を直し、隔離検証とDraft成果物まで通す",
+      "profile": "integer-addition-v1",
+      "allowedFiles": [
+        "experiments/development-harness-fixture/answer.mjs"
+      ],
+      "dependencies": [],
+      "operations": [
+        "apply-proposal",
+        "verify",
+        "prepare-draft"
+      ],
+      "acceptance": "integer-addition-v1; ci-report-regressions; sandbox-probe",
+      "exclusions": "product,ci,harness,policy,auth,tests,publish,merge,deploy"
+    }
+  ],
+  "auth": "existing-chatgpt-no-credits",
+  "maxModelRuns": 4,
+  "issue": 340
+}

@@ -17,22 +17,36 @@ try {
     case 'resume': transaction(directory, s => resumeCancelled(s, target)); result = { state: 'resume-authorized' }; break;
     case 'repair': transaction(directory, s => authorizeRepair(s, target, json(input))); result = { state: 'repair-authorized' }; break;
     case 'accept-fixture': transaction(directory, s => acceptFixture(s, target)); result = { state: 'local-fixture-accepted; no-issue-close' }; break;
+    case 'run-codex':
     case 'run': {
       // Reusable finite serial loop. No scheduler, discovery of extra work, or per-Issue question.
-      const proposals = json(input);
+      const proposals = action === 'run' ? json(input) : null;
       const results = [];
       for (;;) {
         const next = transaction(directory, s => nextTask(s, target));
         if (!next.id) { results.push(next); break; }
-        if (!proposals[next.id]) { results.push({ reason: 'proposal-required', id: next.id }); break; }
-        const outcome = runOne(directory, target, proposals[next.id]);
+        if (proposals && !proposals[next.id]) { results.push({ reason: 'proposal-required', id: next.id }); break; }
+        const outcome = await runOne(directory, target, proposals?.[next.id]);
         results.push(outcome);
-        if (outcome.state !== 'artifacts-ready') { process.exitCode = 1; break; }
+        if (outcome.state !== 'artifacts-ready') {
+          // Only mandatory local output failures justify autonomous repair. Auth, quota,
+          // unknown termination and optional suggestions do not authorize another call.
+          const repaired = action === 'run-codex' && transaction(directory, s => {
+            const t = s.tasks[next.id];
+            if (t.active || t.cancelRequested || t.state !== 'awaiting-decision' ||
+                !['behavior-failed', 'forbidden-proposal'].includes(t.receipts.at(-1)?.diagnostic)) { return false; }
+            authorizeRepair(s, next.id, { kind: 'mandatory-local-failure', head: t.head,
+              reference: `attempt-${t.attempts}-fixed-acceptance-failed` });
+            return true;
+          });
+          if (repaired) { continue; }
+          process.exitCode = 1; break;
+        }
       }
       result = results;
       break;
     }
-    default: throw new Error('unsupported-action; publish-and-live-workers-disabled');
+    default: throw new Error('unsupported-action; publisher-disabled');
   }
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {

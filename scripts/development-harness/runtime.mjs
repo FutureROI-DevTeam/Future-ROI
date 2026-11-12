@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeRecord, parseCounts, countProblems } from '../../.github/scripts/ci-report.mjs';
 import { digest, finish, nextTask, reserve, transaction } from './state.mjs';
+import { generateProposal, processIdentity, recoverModel, stopModelSupervisor } from './codex-worker.mjs';
 
 export const image = 'node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54';
 export const candidatePath = 'experiments/development-harness-fixture/answer.mjs';
@@ -45,9 +46,26 @@ export function stopAndConfirm(name, deadline = Date.now() + 15000) {
   return after;
 }
 
-export function recover(directory, id) {
-  const active = transaction(directory, s => s.tasks[id]?.active);
+export function recover(directory, id, stopSupervisor = stopModelSupervisor) {
+  let active = transaction(directory, s => {
+    const active = s.tasks[id]?.active;
+    if (active?.owner) { active.recoveryRequested = true; }
+    return active;
+  });
   if (!active) { throw new Error('no-active-worker'); }
+  if (active.owner) {
+    stopSupervisor(active);
+    // Registration may have advanced while the supervisor was stopping. Never use its old PID.
+    const latest = transaction(directory, s => s.tasks[id]?.active);
+    if (!latest || latest.container !== active.container || latest.owner?.start !== active.owner.start) { throw new Error('recovery-reservation-changed'); }
+    active = latest;
+  }
+  if (active.phase?.startsWith('model-')) {
+    recoverModel(active);
+    transaction(directory, s => finish(s, id, { container: active.container, stopped: true, passed: false,
+      diagnostic: 'recovered-model-interruption', head: null }));
+    return;
+  }
   const deadline = Date.now() + 15000;
   stopAndConfirm(active.container, deadline);
   // A CREATED container is restartable by an in-flight controller. Remove that exact UUID
@@ -76,13 +94,15 @@ const absent=['/var/run/docker.sock','/root/.codex/auth.json','/root/.config/gh/
 const secrets=Object.keys(process.env).filter(k=>/TOKEN|SECRET|API_KEY|CANARY/.test(k));
 console.log(JSON.stringify({denied,absent:absent.every(f=>!fs.existsSync(f)),secrets:secrets.length}));`;
 
-export function runOne(directory, batchId, proposal) {
-  validateProposal(proposal);
+export async function runOne(directory, batchId, proposal) {
+  if (proposal) { validateProposal(proposal); }
   directory = resolve(directory);
   if (directory.includes(',')) { throw new Error('unsupported-mount-path'); }
   const selected = transaction(directory, s => nextTask(s, batchId));
   if (!selected.id) { return selected; }
   const id = selected.id;
+  const contract = transaction(directory, s => s.batches[batchId].contract);
+  if ((!proposal) !== (contract.mode === 'codex-fixture')) { throw new Error('worker-mode-mismatch'); }
   const name = 'roi-harness-' + randomUUID();
   const base = git(['rev-parse', 'HEAD']);
   // Read committed baseline code only; never mount checkout/.git/HOME/socket into the worker.
@@ -92,9 +112,11 @@ export function runOne(directory, batchId, proposal) {
   // Known prerequisites fail before reservation. Uncertain create results still occupy a slot.
   command('docker', ['info', '--format', '{{.ServerVersion}}']);
   // Docker may store a tag pull only as repository@digest, without the tag@digest alias.
-  command('docker', ['image', 'inspect', 'node@' + image.split('@')[1]]);
+  try { command('docker', ['image', 'inspect', image]); }
+  catch { command('docker', ['image', 'inspect', 'node@' + image.split('@')[1]]); }
   const attempt = transaction(directory, s => {
     reserve(s, id, name);
+    if (!proposal) { s.tasks[id].active.owner = processIdentity(process.pid); s.tasks[id].active.phase = 'model-preflight'; }
     return { number: s.tasks[id].attempts, ms: s.batches[batchId].contract.attemptMs, startedAt: s.tasks[id].active.startedAt };
   });
   const folder = join(directory, id, String(attempt.number));
@@ -105,8 +127,6 @@ export function runOne(directory, batchId, proposal) {
   for (const d of [policy, input, snapshot, results]) { mkdirSync(d, { recursive: true }); }
   writeFileSync(join(results, 'result.json'), JSON.stringify({ state: 'not-run' }));
   writeFileSync(join(snapshot, 'answer.mjs'), baseline);
-  writeFileSync(join(input, 'proposal.json'), JSON.stringify(proposal));
-  writeFileSync(join(input, 'answer.mjs'), proposal.files[candidatePath]);
   writeFileSync(join(policy, 'worker.mjs'), worker);
   writeFileSync(join(policy, 'result-canary'), 'host-owned');
   // Reuse the committed existing checks; candidate cannot replace their code or result record.
@@ -121,9 +141,21 @@ export function runOne(directory, batchId, proposal) {
   let record = null;
   let isolation = null;
   let created = false;
+  let creationAttempted = false;
+  let modelReceipt = null;
   const remaining = () => timeRemaining(deadline - 15000);
   const exec = args => command('docker', ['exec', name, ...args], { timeout: remaining() });
   try {
+    if (!proposal) {
+      const generated = await generateProposal({ directory, id, folder, deadline, base, baseline });
+      proposal = validateProposal(generated.proposal);
+      modelReceipt = generated.modelReceipt;
+    }
+    if (transaction(directory, s => s.tasks[id].cancelRequested)) { throw new Error('cancelled'); }
+    writeFileSync(join(input, 'proposal.json'), JSON.stringify(proposal));
+    writeFileSync(join(input, 'answer.mjs'), proposal.files[candidatePath]);
+    transaction(directory, s => { s.tasks[id].active.phase = 'container-starting'; });
+    creationAttempted = true;
     command('docker', ['create', '--name', name, '--label', `future-roi-harness=${name}`, '--pull', 'never',
       '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
       '--user', '1000:1000', '--pids-limit', '64', '--memory', '256m', '--cpus', '1',
@@ -135,6 +167,7 @@ export function runOne(directory, batchId, proposal) {
       '--mount', `type=bind,src=${results},dst=/results,readonly`,
       '--workdir', '/work', image, 'node', '/policy/worker.mjs', String(attempt.ms - 15000)], { timeout: remaining() });
     created = true;
+    transaction(directory, s => { s.tasks[id].active.phase = 'container-running'; });
     command('docker', ['start', name], { timeout: remaining() });
     isolation = JSON.parse(exec(['node', '-e', probe]));
     if (isolation.denied !== 6 || !isolation.absent || isolation.secrets !== 0 ||
@@ -164,22 +197,28 @@ export function runOne(directory, batchId, proposal) {
     const tree = boundedGit(['write-tree']);
     head = boundedGit(['commit-tree', tree, '-p', base, '-m', 'test: 隔離fixtureの整数加算を修正する']);
     writeFileSync(join(folder, 'candidate.patch'), command('git', ['diff', '--binary', base, head], { timeout: timeRemaining(deadline) }));
-    writeFileSync(join(folder, 'draft-pr.md'), `## 何を変えたか\n\n整数加算fixtureを修正したローカル比較成果物。実Issueの完了ではありません。\n\n## 検証\n\n- 外側の整数出力照合、隔離書込み拒否、既存ci-report回帰: 成功\n- baseline/checkout: ${base}\n- candidate commit: ${head}\n- PR後CI: 未実行。Draft未発行。レビュー可能ではありません。\n- 総費用・人の時間: 未計測。新規モデル/API呼出しなし。\n\n## 関連Issue\n\nRefs #340（ハーネス実装PRとは別の実証用成果物）\n`);
+    writeFileSync(join(folder, 'draft-pr.md'), `## 何を変えたか\n\n整数加算fixtureを修正したローカル比較成果物。実Issueの完了ではありません。\n\n## 検証\n\n- 外側の整数出力照合、隔離書込み拒否、既存ci-report回帰: 成功\n- baseline/checkout: ${base}\n- candidate commit: ${head}\n- PR後CI: 未実行。Draft未発行。レビュー可能ではありません。\n- 総費用・人の時間: 未計測。モデル実行の有無・利用tokenは results/result.json の model を参照。追加API課金経路なし。\n\n## 関連Issue\n\nRefs #340（ハーネス実装PRとは別の実証用成果物）\n`);
     timeRemaining(deadline);
     diagnostic = 'none';
     passed = true;
   } catch (error) {
     // Persist only fixed diagnostic codes, never candidate stdout, exception strings or env values.
-    if (['isolation-failed', 'behavior-failed', 'candidate-mutated', 'existing-check-incomplete', 'attempt-time-budget', 'cancelled'].includes(error.message)) {
+    if (['isolation-failed', 'behavior-failed', 'candidate-mutated', 'existing-check-incomplete', 'attempt-time-budget', 'cancelled',
+      'forbidden-proposal', 'model-failed-or-unconfirmed', 'model-result-incomplete', 'model-usage-unknown',
+      'subscription-quota-or-zero-spend-unverified', 'existing-auth-snapshot-unavailable', 'codex-tool-boundary-unverified'].includes(error.message)) {
       diagnostic = error.message;
     }
   }
   let stopped = false;
+  if (!creationAttempted && contract.mode === 'codex-fixture') {
+    const active = transaction(directory, s => s.tasks[id].active);
+    stopped = !!active && !active.authHome && (active.phase === 'model-stopped' || active.phase === 'model-preflight');
+  }
   if (created) {
     try { stopAndConfirm(name, deadline); stopped = true; } catch { /* Occupy the slot until explicit recovery. */ }
   }
   const receipt = { container: name, stopped, passed: passed && stopped, diagnostic, head,
-    baselineSha: base, candidateDigest: digest(proposal), isolation, existingCheck: record,
+    baselineSha: base, candidateDigest: proposal ? digest(proposal) : null, isolation, existingCheck: record, model: modelReceipt,
     image, externalCI: 'not-run', totalCostCents: null, incrementalBillableCalls: 0 };
   writeFileSync(join(results, 'result.json'), JSON.stringify(receipt, null, 2) + '\n');
   if (stopped) { transaction(directory, s => {

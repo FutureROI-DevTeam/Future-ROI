@@ -12,15 +12,19 @@ export const reviewStates = ['artifacts-ready', 'draft-created', 'ci-wait', 'rev
 // not instructions from an issue, candidate, log, or arbitrary command in JSON.
 export function validateContract(c) {
   insist(c?.version === 1 && c.repository === repository && /^[a-z0-9-]{1,48}$/.test(c.batchId), 'invalid-contract');
-  insist(c.mode === 'local-fixture' && c.publish === false, 'live-execution-disabled');
+  insist(['local-fixture', 'codex-fixture'].includes(c.mode) && c.publish === false, 'live-execution-disabled');
   insist(c.workers === 1 && c.reviewLimit === 1 && c.maxRepairs === 3, 'unsupported-capacity');
-  insist(positive(c.attemptMs) && c.attemptMs > 15000 && c.attemptMs <= 60000 && positive(c.batchMs) && positive(c.taskMs), 'invalid-time-budget');
+  insist(positive(c.attemptMs) && c.attemptMs > 15000 && c.attemptMs <= (c.mode === 'codex-fixture' ? 300000 : 60000) && positive(c.batchMs) && positive(c.taskMs), 'invalid-time-budget');
   insist(positive(c.lifetimeMs) && c.lifetimeMs <= 86400000, 'invalid-lifetime');
   insist(c.maxCostCents === 0, 'billable-execution-disabled');
+  if (c.mode === 'codex-fixture') {
+    insist(c.auth === 'existing-chatgpt-no-credits' && c.maxModelRuns === 4 && c.issue === 340, 'unsupported-model-contract');
+  }
   insist(Array.isArray(c.tasks) && c.tasks.length > 0 && c.tasks.length <= 10, 'finite-batch-required');
   const ids = new Set();
   for (const t of c.tasks) {
     insist(/^fixture-[a-z0-9-]{1,32}$/.test(t.id) && !ids.has(t.id), 'invalid-or-duplicate-task');
+    if (c.mode === 'codex-fixture') { insist(t.id === 'fixture-issue-340', 'issue-identity-required'); }
     ids.add(t.id);
     insist(typeof t.purpose === 'string' && t.purpose.length > 0 && t.purpose.length <= 300, 'purpose-required');
     insist(t.revision === 1 && t.profile === 'integer-addition-v1', 'unsupported-revision-or-profile');
@@ -49,7 +53,7 @@ export function enroll(s, c, now = Date.now()) {
   }
   // Stable identity excludes revision and batch. Existing work must be reconciled, never reset.
   insist(c.tasks.every(t => !s.tasks[t.id]), 'existing-task-reconcile-first');
-  s.batches[c.batchId] = { fingerprint, contract: c, reservedMs: 0, createdAt: now, expiresAt: now + c.lifetimeMs };
+  s.batches[c.batchId] = { fingerprint, contract: c, reservedMs: 0, modelRuns: 0, createdAt: now, expiresAt: now + c.lifetimeMs };
   for (const t of c.tasks) {
     s.tasks[t.id] = { batchId: c.batchId, revision: t.revision, state: 'eligible', attempts: 0,
       reservedMs: 0, actualMs: 0, active: null, cancelRequested: false, writeIntent: null,
@@ -61,6 +65,7 @@ export function nextTask(s, batchId, now = Date.now()) {
   const b = s.batches[batchId];
   insist(b, 'unknown-batch');
   if (Object.values(s.tasks).some(t => t.active)) { return { reason: 'worker-stop-unconfirmed' }; }
+  if (b.contract.mode === 'codex-fixture' && b.modelRuns >= b.contract.maxModelRuns) { return { reason: 'model-run-budget' }; }
   if (now + b.contract.attemptMs > b.expiresAt) { return { reason: 'lifetime-budget' }; }
   for (const spec of b.contract.tasks) {
     const t = s.tasks[spec.id];
@@ -82,6 +87,7 @@ export function reserve(s, id, container, now = Date.now()) {
   t.attempts += 1;
   t.reservedMs += b.contract.attemptMs;
   b.reservedMs += b.contract.attemptMs;
+  if (b.contract.mode === 'codex-fixture') { b.modelRuns += 1; }
   t.active = { container, startedAt: now, attempt: t.attempts };
   t.state = 'implementing';
   t.resumeReason = null;

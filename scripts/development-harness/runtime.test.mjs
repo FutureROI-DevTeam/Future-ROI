@@ -16,11 +16,11 @@ const setup = () => {
   return { directory, c, id: c.tasks[0].id };
 };
 
-test('実Docker: 正常差分→拒否probe→既存検証→commit/patch/Draft成果物、再送は増殖しない', () => {
+test('実Docker: 正常差分→拒否probe→既存検証→commit/patch/Draft成果物、再送は増殖しない', async () => {
   const { directory, c, id } = setup();
   process.env.ROI_HARNESS_SECRET_CANARY = 'synthetic-host-only';
   try {
-    const result = runOne(directory, c.batchId, proposal());
+    const result = await runOne(directory, c.batchId, proposal());
     const receipt = JSON.parse(readFileSync(join(result.folder, 'results/result.json')));
     assert.equal(result.state, 'artifacts-ready', JSON.stringify(receipt));
     assert.equal(receipt.isolation.denied, 6);
@@ -31,32 +31,32 @@ test('実Docker: 正常差分→拒否probe→既存検証→commit/patch/Draft�
     assert.match(receipt.head, /^[a-f0-9]{40}$/);
     assert.match(readFileSync(join(result.folder, 'candidate.patch'), 'utf8'), /a \+ b/);
     assert.match(readFileSync(join(result.folder, 'draft-pr.md'), 'utf8'), /Draft未発行/);
-    assert.ok(runOne(directory, c.batchId, proposal()).reason);
+    assert.ok((await runOne(directory, c.batchId, proposal())).reason);
     assert.equal(transaction(directory, s => s.tasks[id].attempts), 1);
     console.log(JSON.stringify({ evidenceDirectory: directory, head: receipt.head }));
   } finally { delete process.env.ROI_HARNESS_SECRET_CANARY; }
 });
 
-test('実Docker: 誤実装・偽TAP成功を拒否し、同じ台帳で修復後に合格', () => {
+test('実Docker: 誤実装・偽TAP成功を拒否し、同じ台帳で修復後に合格', async () => {
   const { directory, c, id } = setup();
   const wrong = { files: { [candidatePath]: 'const values=JSON.parse(process.argv[2]); console.log(JSON.stringify(values.map(([a,b])=>a-b)));\n' } };
-  const wrongResult = runOne(directory, c.batchId, wrong);
+  const wrongResult = await runOne(directory, c.batchId, wrong);
   assert.equal(wrongResult.state, 'awaiting-decision');
   assert.equal(JSON.parse(readFileSync(join(wrongResult.folder, 'results/result.json'))).diagnostic, 'behavior-failed');
   transaction(directory, s => authorizeRepair(s, id, { kind: 'mandatory-local-failure', head: null, reference: 'wrong-output-rejected' }));
   const fake = { files: { [candidatePath]: 'console.log("# tests 1\\n# pass 1\\n# fail 0");\n' } };
-  const failed = runOne(directory, c.batchId, fake);
+  const failed = await runOne(directory, c.batchId, fake);
   assert.equal(failed.state, 'awaiting-decision');
   const receipt = JSON.parse(readFileSync(join(failed.folder, 'results/result.json')));
   assert.equal(receipt.passed, false);
   transaction(directory, s => authorizeRepair(s, id, { kind: 'mandatory-local-failure', head: null, reference: 'fake-success-rejected' }));
-  const repaired = runOne(directory, c.batchId, proposal());
+  const repaired = await runOne(directory, c.batchId, proposal());
   assert.equal(repaired.state, 'artifacts-ready');
   assert.equal(transaction(directory, s => s.tasks[id].attempts), 3);
   assert.equal(transaction(directory, s => s.tasks[id].reservedMs), 180000);
 });
 
-test('実Docker: worker生存中の取消では枠を解放せず、runtime停止確認後に復旧', () => {
+test('実Docker: worker生存中の取消では枠を解放せず、runtime停止確認後に復旧', async () => {
   const { directory, c, id } = setup();
   const name = 'roi-harness-stop-' + Date.now();
   command('docker', ['create', '--pull', 'never', '--name', name, '--label', `future-roi-harness=${name}`, '--network', 'none',
@@ -106,18 +106,18 @@ test('実CLI中断: hostをkillしてもcontainerと台帳が残り、二重起�
   }
 });
 
-test('AR-02 実Docker: 遅い候補を共通期限で止め、新しい合格成果物を作らない', () => {
+test('AR-02 実Docker: 遅い候補を共通期限で止め、新しい合格成果物を作らない', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'roi-harness-deadline-'));
   initialize(directory); const c = contract(); c.attemptMs = 20000;
   transaction(directory, s => enroll(s, c));
-  const result = runOne(directory, c.batchId, { files: { [candidatePath]: 'setTimeout(()=>{},40000);\n' } });
+  const result = await runOne(directory, c.batchId, { files: { [candidatePath]: 'setTimeout(()=>{},40000);\n' } });
   assert.notEqual(result.state, 'artifacts-ready');
   assert.equal(JSON.parse(readFileSync(join(result.folder, 'results/result.json'))).passed, false);
   if (result.state === 'stop-unconfirmed') { recover(directory, c.tasks[0].id); }
   assert.ok(transaction(directory, s => s.tasks[c.tasks[0].id].reservedMs) >= 20000);
 });
 
-test('FR-01 実Docker: createdの復旧後に元controllerが遅れてstartしても実行できない', () => {
+test('FR-01 実Docker: createdの復旧後に元controllerが遅れてstartしても実行できない', async () => {
   const { directory, c, id } = setup();
   const name = 'roi-harness-created-' + Date.now();
   command('docker', ['create', '--pull', 'never', '--name', name, '--label', `future-roi-harness=${name}`,

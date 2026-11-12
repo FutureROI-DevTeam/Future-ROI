@@ -1,6 +1,29 @@
 # 有限batchの開発ハーネス
 
-[#340](https://github.com/FutureROI-DevTeam/Future-ROI/issues/340)のローカル比較入口。既存Codex＋Skillsで準備した差分を、契約に沿って隔離適用・検証し、候補commit・patch・Draft本文を保存する。現時点の実行profileは無害な整数加算fixtureだけ。実Issueの自律実装、モデル呼出し、自動push/PR/merge/Closeは無効であり、汎用の自律開発基盤ではない。
+[#340](https://github.com/FutureROI-DevTeam/Future-ROI/issues/340)の有限実行入口。既存Codex CLIに実装差分を生成させ、固定契約に沿って隔離検証し、候補commit・patch・Draft本文を保存する。最初の対象は同Issueの無害な整数加算fixture。実backlogの製品Issueを実装・完了したとは扱わない。任意Issueへの汎用実行、自動push/PR/merge/Closeは無効。
+
+## 実Codex workerの起動
+
+Windowsの既存Codex CLI **0.151.0**、既存ChatGPT認証、Dockerを使う。CLI版・実体hash・固定catalog・ツール非公開/未登録呼出し拒否probe・利用枠を各attemptで確認する。新APIキーや設定変更は不要。別CLI版/OSは未検証として拒否する。既存認証が期限切れなら新認証を自動作成せず停止する。
+
+```powershell
+$stateDir = Join-Path $env:LOCALAPPDATA 'FutureROI-harness-codex'
+# init/enrollは初回だけ。同じ台帳を使い続ける。
+node scripts/development-harness/cli.mjs init $stateDir
+node scripts/development-harness/cli.mjs enroll $stateDir scripts/development-harness/codex-contract.json
+node scripts/development-harness/cli.mjs run-codex $stateDir codex-comparison-1
+node scripts/development-harness/cli.mjs status $stateDir
+```
+
+固定Issue #340は `fixture-issue-340` に紐づき、別IDによる再登録を拒否する。Codexはtrusted側が渡す目的・固定baseline・許可パス・必須修正情報を読み、構造化sourceを返す。合格は回答文でなく外側の固定検査が判断する。固定scope違反/実出力不一致だけは、初回＋最大3回まで同じ台帳で修復する。auth/利用枠/判定不能/停止不明は自動再試行しない。レビュー待ちheadは必須修正入力まで固定。
+
+Codex modeはattempt 300秒、task/batch 1200秒、登録から1時間、モデル**CLI起動予約**最大4回。予約は失敗/再起動でも返さない。HTTP推論要求数の上限4ではない。内部HTTP/stream retryは0、未登録toolへの応答後は同じCLI内で再推論があり得る。token利用量はCLI完了eventから記録し、不明なrequest数/総費用を0としない。
+
+認証は専用DACLを確認した一時ホームに既存access/id tokenだけを複写する。API key・refresh token・元設定・global AGENTS・メモリは渡さない。原本のhardlinkは更新を伝播するため使用しない。終了確認後に一時ホームを削除し、削除失敗/停止未確認は枠を保持する。候補Dockerへはこのホームを一切マウントしない。利用枠取得で追加creditsなし、使用95%未満を確認できるときだけ推論を始める。新規課金上限0は総費用0の意味ではない。
+
+停止は `cancel $stateDir fixture-issue-340`、復旧は `recover $stateDir fixture-issue-340`。復旧はsupervisorを終了確認し、最新台帳の子processをPID/開始時刻/pathで照合して停止する。PID登録前の応答喪失は停止不明として保持する。停止後 `resume`、同じ `run-codex` で再開する。上限/有効期限はリセットしない。必須修正の `repair` と計測の `measure` は下記と共通。
+
+`model-input-digest.json` は入力digest/基準SHA、`model-result.json` はCLI実体・catalog・拒否probe・token利用・利用枠を保存する。raw transcript/token実値は保存しない。`results/result.json` とpatch/Draftは従来と共通。実認証でのPR→CI確認は未接続。
 
 ## 実行契約と状態
 
@@ -10,7 +33,7 @@
 
 初期値はworker 1、レビュー待ち1、初回＋修復3回。1 attemptは60秒を前払い予約し、うち15秒を終了・照合に残す。taskは240秒、例のbatchは480秒、batchの有効期間は登録から1時間。時間予約は失敗・再起動・担当交替・head更新でも返却しない。期限切れや上限時は次の実行を止め、終了・照合だけを行う。Docker停止/API自体の障害では時間内停止を保証せず、active枠を保持する。
 
-新しい課金処理の上限は0円で、実際にモデル・外部APIの課金呼出しを持たない。これは総費用0円を意味しない。既存セッション、レビュー、導入、電力などを含む総費用は `null`（不明）のまま記録する。正の課金上限を設定して実モデルworkerを有効にすることはできない。
+local-fixture modeはモデルを呼ばず手動proposalを適用する比較入口。両modeとも新しい課金処理の上限は0円。既存セッション、レビュー、導入、電力などを含む総費用は `null`（不明）のまま記録する。正の課金上限やAPI keyで実行範囲を広げる設定は持たない。
 
 レビュー成果物が1件あれば、次の作業を増やさず再開条件を返してexit 0。失敗や停止未確認はexit 1。固定headへの必須修正証拠がある場合だけ `repair` で再開できる。これはtrusted operatorからの入力で、候補やreview本文を自動で権限へ変換しない。
 
@@ -62,6 +85,9 @@ node scripts/development-harness/cli.mjs run $stateDir local-comparison-1 (Join-
 
 ```powershell
 node --test scripts/development-harness/state.test.mjs
+node --test scripts/development-harness/codex.test.mjs
+# Windows＋固定CLIで明示実行。fake authだけでモデル課金なし。
+node --test scripts/development-harness/codex-runtime.test.mjs
 node --test scripts/development-harness/runtime.test.mjs
 npm run verify:ci-reports
 npm run verify:foundation
@@ -73,7 +99,7 @@ Docker回帰はruntime欠落時にskipせず失敗する。ApplicationにDocker�
 
 | 項目 | 現在 | 次の判断と必要理由 |
 | --- | --- | --- |
-| AW/モデル | AW未導入・購読認証、実worker無効 | 固定AW/engine/modelの適合、課金枠と総費用計測、認証分離を比較。App/Secret作成は別承認 |
+| AW/モデル | 固定Codex 0.151.0＋既存購読の構造化source生成、AW未導入 | 別OS/CLI/AWやAPI認証は別適合検証。App/Secret作成は別承認 |
 | main/発行 | main保護未確認ではなく取得時false、publisherなし | direct push・bypass・必須check省略をGitHub側で拒否する具体設定と権限を別途承認・検証 |
 | 実作業profile | fixtureのみ | 対象Issueの契約、既存branch/PR/未確定操作照合、変更に応じた固定検査を追加レビュー |
 | CI | 状態照合のローカル回帰のみ | 実認証Draft→CI開始・承認待ち→出所と最新attemptの取得を通す |
