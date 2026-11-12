@@ -102,7 +102,7 @@ serveが出す`http://127.0.0.1:<port>/`を通常ブラウザで開きます。�
 
 Missing existing verification dependenciesは上記install不足、型検証失敗は候補/負例の不一致、Vite build失敗はその出力を確認します。依存manifestやrootを変更して回避せず、修正後に同じcheckを再実行します。
 
-確認環境はWindows x64/Node22.15.1/npm10.9.2、既存lockのTypeScript5.8.3、React/React DOMと型19.3.0、Vite8.3.1です。既存experimentのenginesは24.21.0のためNode22 installではEBADENGINE warningがあります。候補CIはNode24.21.0を使います。これらの版は本番runtime採択を示しません。
+確認環境はWindows x64/Node22.15.1/npm10.9.2、既存lockのTypeScript5.8.3、React/React DOMと型19.3.0、Vite8.3.1です。既存experimentのenginesは24.21.0のためNode22 installではEBADENGINE warningがあります。現行の候補CIはNode24.22.3を使います。これらの版は本番runtime採択を示しません。
 
 ## Engine候補からのローカル接続確認
 
