@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import type { Log, LogPut, HistoryEdit } from '../contracts/log.ts';
+import type { Log, LogPut, LogChange, HistoryEdit } from '../contracts/log.ts';
 import { isGoalId } from '../goals/goal-id.ts';
 import { localDateIn, shiftLocalDate } from '../goals/local-date.ts';
 
@@ -10,7 +10,7 @@ type LogRow = { local_date: string; status: Log['status']; amount: number | null
 const toLog = (r: LogRow): Log => ({ localDate: r.local_date, status: r.status, amount: r.amount });
 
 export type PutLogResult =
-  | { kind: 'saved'; log: Log }
+  | { kind: 'saved'; log: Log; change?: LogChange }
   | { kind: 'not_found' | 'settings_conflict' | 'history_conflict' }
   | { kind: 'out_of_window'; today: string; yesterday: string }
   | { kind: 'before_start'; recordStartDate: string };
@@ -25,14 +25,15 @@ export async function putLog(
   localDate: string,
   body: LogPut,
   clock: () => Date,
+  includeChange = false,
 ): Promise<PutLogResult> {
   if (!isGoalId(goalId)) return { kind: 'not_found' };
   const client = await pool.connect();
   try {
     await client.query('begin isolation level read committed');
     const goal = (
-      await client.query<{ timezone: string; record_start_date: string; session_amount: number; goal_settings_revision: number; history_revision: string }>(
-        'select timezone, record_start_date::text as record_start_date, session_amount, goal_settings_revision, history_revision::text as history_revision from goal where id = $1 and user_id = $2 for update',
+      await client.query<{ timezone: string; record_start_date: string; session_amount: number; goal_settings_revision: number; history_revision: string; unit: LogChange['unit']; total_required: number }>(
+        'select timezone, record_start_date::text as record_start_date, session_amount, goal_settings_revision, history_revision::text as history_revision, unit, total_required from goal where id = $1 and user_id = $2 for update',
         [goalId, userId],
       )
     ).rows[0];
@@ -59,6 +60,11 @@ export async function putLog(
       return { kind: 'before_start', recordStartDate: goal.record_start_date };
     }
     const amount = body.status === 'DONE' ? body.amount! : null;
+    // 同じGoalの記録・設定更新はこのlockで順序づく。画面の旧量ではなくDBの直前量を使う。
+    const previous = includeChange ? (await client.query<LogRow>(
+      'select local_date::text as local_date, status, amount from action_log where goal_id = $1 and local_date = $2::date',
+      [goalId, localDate],
+    )).rows[0] : undefined;
     const saved = await client.query<LogRow>(
       `insert into action_log (goal_id, local_date, status, amount) values ($1, $2::date, $3, $4)
        on conflict (goal_id, local_date) do update set status = excluded.status, amount = excluded.amount
@@ -71,8 +77,18 @@ export async function putLog(
         [goalId],
       );
     }
+    let change: LogChange | undefined;
+    if (includeChange) {
+      const previousAmount = previous?.status === 'DONE' ? previous.amount! : 0;
+      // triggerの履歴版を同じtransactionで取得。後続の別保存をFEが今回の結果へ混ぜない。
+      const revision = (await client.query<{ revision: string }>(
+        'select history_revision::text as revision from goal where id = $1 and user_id = $2', [goalId, userId],
+      )).rows[0]!.revision;
+      change = { goalId, previousAmount, amountDelta: (amount ?? 0) - previousAmount,
+        totalRequired: goal.total_required, unit: goal.unit, goalSettingsRevision: goal.goal_settings_revision, historyRevision: revision };
+    }
     await client.query('commit');
-    return { kind: 'saved', log: toLog(saved.rows[0]!) };
+    return { kind: 'saved', log: toLog(saved.rows[0]!), ...(change ? { change } : {}) };
   } catch (error) {
     await client.query('rollback').catch(() => {});
     throw error;

@@ -1,5 +1,5 @@
-import { Log as LogSchema, LogList, TodayR11 as TodaySchema } from '@contracts';
-import type { Log, LogPut, TodayR11 } from '@contracts';
+import { LogSaveResult as LogSaveSchema, LogList, TodayR11 as TodaySchema } from '@contracts';
+import type { Log, LogPut, LogSaveResult, TodayR11 } from '@contracts';
 import { requestJson } from './http.ts';
 
 /**
@@ -18,8 +18,8 @@ export const todayHttp = {
   /** 全期間の記録（累計の図に使う）。 */
   listLogs: (goalId: string, signal?: AbortSignal): Promise<Log[]> => requestJson(LogList, `${base(goalId)}/logs`, { signal }),
   /** 記録の作成・上書き（同じ日は上書き）。DONE は表示した日合計の amount と設定版を明示する。 */
-  putLog: (goalId: string, localDate: string, body: LogPut): Promise<Log> =>
-    requestJson(LogSchema, `${base(goalId)}/logs/${encodeURIComponent(localDate)}`, { method: 'PUT', body }),
+  putLog: (goalId: string, localDate: string, body: LogPut): Promise<LogSaveResult> =>
+    requestJson(LogSaveSchema, `${base(goalId)}/logs/${encodeURIComponent(localDate)}?view=change`, { method: 'PUT', body }),
 };
 
 export const todayKeys = {

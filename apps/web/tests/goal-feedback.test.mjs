@@ -25,17 +25,20 @@ function snapshot(logs, settings = {}) {
   const done = logs.filter(l => l.status === 'DONE').reduce((n, l) => n + l.amount, 0);
   const goal = { id: 'g', title: '合成 Goal', unit: 'minutes', totalRequired: 12000, sessionAmount: 30,
     initialProgress: 0, timezone: 'UTC', recordStartDate: '2026-10-10', today: date,
-    goalSettingsRevision: 0, answerRevision: 0, unitLocked: false, progressDone: done,
+    goalSettingsRevision: 0, answerRevision: 0, historyRevision: '1', unitLocked: false, progressDone: done,
     todayStatus: todayLog?.status ?? 'UNRECORDED', ...settings };
   const today = { today: date, yesterday: '2026-10-10', todayLog,
     yesterdayMissing: !logs.some(l => l.localDate === '2026-10-10'),
     prediction: { today: date, todayStatus: goal.todayStatus, progress: { done, total: goal.totalRequired } },
-    context: { goalSettingsRevision: goal.goalSettingsRevision, answerRevision: goal.answerRevision,
+    context: { goalSettingsRevision: goal.goalSettingsRevision, answerRevision: goal.answerRevision, historyRevision: goal.historyRevision,
       unitLocked: goal.unitLocked, unit: goal.unit, sessionAmount: goal.sessionAmount, recordStartDate: goal.recordStartDate } };
   return { goal, today, logs };
 }
 const done = amount => ({ localDate: date, status: 'DONE', amount });
 const skip = { localDate: date, status: 'SKIPPED', amount: null };
+const receipt = (log, previousAmount, overrides = {}) => ({ ...log, change: { goalId: 'g', previousAmount,
+  amountDelta: (log.amount ?? 0) - previousAmount, totalRequired: 12000, unit: 'minutes',
+  goalSettingsRevision: 0, historyRevision: '1', ...overrides } });
 test('時間表示から同じbodyを作り、未変更PATCHを出さず、不正なdraftをrebaseで消さない', () => {
   const g = { ...snapshot([]).goal, initialProgress: 1240, hasLogs: false, questionPrior: { a: null, b: null } };
   const values = { ...valuesFromGoal(g), totalRequired: '@hm:["200","0"]', initialProgress: '@hm:["20","40"]' };
@@ -53,21 +56,32 @@ test('時間表示から同じbodyを作り、未変更PATCHを出さず、不�
   assert.ok(validate({ ...values, sessionAmount: '@hm:["0","30"]' }).sessionAmount, '1回の量は整数分の入力契約を保つ');
 });
 test('200時間へ30分保存は+0.25ポイント、30→20分の訂正は−10分', () => {
-  assert.deepEqual(confirmedSaveFeedback(snapshot([]), snapshot([done(30)]), done(30)),
+  assert.deepEqual(confirmedSaveFeedback(snapshot([]), snapshot([done(30)]), receipt(done(30), 0)),
     { amount: 30, points: .25, unit: 'minutes', localDate: date });
-  assert.equal(confirmedSaveFeedback(snapshot([done(30)]), snapshot([done(20)]), done(20)).amount, -10);
-  assert.equal(confirmedSaveFeedback(snapshot([done(30)]), snapshot([skip]), skip).amount, -30);
+  assert.equal(confirmedSaveFeedback(snapshot([done(30)]), snapshot([done(20)]), receipt(done(20), 30)).amount, -10);
+  assert.equal(confirmedSaveFeedback(snapshot([done(30)]), snapshot([skip]), receipt(skip, 30)).amount, -30);
 });
 test('ゼロ増分・不整合・設定変更・他日更新には増分を出さない', () => {
-  assert.equal(confirmedSaveFeedback(snapshot([]), snapshot([skip]), skip), null);
-  assert.equal(confirmedSaveFeedback(snapshot([done(30)]), snapshot([done(30)]), done(30)), null);
+  assert.equal(confirmedSaveFeedback(snapshot([]), snapshot([skip]), receipt(skip, 0)), null);
+  assert.equal(confirmedSaveFeedback(snapshot([done(30)]), snapshot([done(30)]), receipt(done(30), 30)), null);
   for (const settings of [{ totalRequired: 6000 }, { goalSettingsRevision: 1 }, { answerRevision: 1 }, { sessionAmount: 20 }, { timezone: 'Asia/Tokyo' }]) {
-    assert.equal(confirmedSaveFeedback(snapshot([]), snapshot([done(30)], settings), done(30)), null);
+    assert.equal(confirmedSaveFeedback(snapshot([]), snapshot([done(30)], settings), receipt(done(30), 0)), null);
   }
-  assert.equal(confirmedSaveFeedback(snapshot([]), snapshot([done(30), { localDate: '2026-10-10', status: 'DONE', amount: 10 }]), done(30)), null);
+  assert.equal(confirmedSaveFeedback(snapshot([]), snapshot([done(30), { localDate: '2026-10-10', status: 'DONE', amount: 10 }]), receipt(done(30), 0)), null);
   const stale = snapshot([done(30)]); stale.goal.progressDone = 0;
-  assert.equal(confirmedSaveFeedback(snapshot([]), stale, done(30)), null);
-  assert.equal(confirmedSaveFeedback(snapshot([]), snapshot([done(20)]), done(30)), null);
+  assert.equal(confirmedSaveFeedback(snapshot([]), stale, receipt(done(30), 0)), null);
+  assert.equal(confirmedSaveFeedback(snapshot([]), snapshot([done(20)]), receipt(done(30), 0)), null);
+});
+
+test('古い表示20分・DB直前40分・保存30分は表示差+10でなく実増減−10分', () => {
+  const before = snapshot([done(20)], { historyRevision: '1' });
+  const after = snapshot([done(30)], { historyRevision: '3' });
+  assert.equal(confirmedSaveFeedback(before, after, receipt(done(30), 40, { historyRevision: '3' })).amount, -10);
+  assert.equal(confirmedSaveFeedback(before, after, done(30)), null, '旧応答から差分を推測しない');
+  for (const changed of [{ historyRevision: '2' }, { goalId: 'other' }, { totalRequired: 6000 },
+    { unit: 'sessions' }, { amountDelta: 10 }, { goalSettingsRevision: 1 }]) {
+    assert.equal(confirmedSaveFeedback(before, after, receipt(done(30), 40, { historyRevision: '3', ...changed })), null);
+  }
 });
 test('積み上げ軸は0起点の実績尺度で超過を保持し、初日に架空の未来点を作らない', () => {
   const chart = cumulativeChart([done(125)], 0, 100, date, date, 350, 1);

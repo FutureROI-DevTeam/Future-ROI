@@ -409,6 +409,7 @@ CREATE TABLE action_log (
 | `POST /api/goals` | UUID Idempotency-Key必須。初回201＋Goal DTO、同owner/key/bodyの再送200＋現在DTO、異body409、削除後410（D-29）。body：`title, unit, totalRequired, initialProgress, sessionAmount, timezone, targetDate?`。任意の`targetDate`は暦にある`YYYY-MM-DD`で、作成時timezoneの今日より後だけ（違反は422）。省略・`null`は未設定（#157、P-19）。初期量の既定は0で、記録開始日の前日までの量。timezoneは有効なIANA名のみ（それ以外は422）。記録開始日は作成時のtimezoneの暦日で固定し`recordStartDate`で返す（#76） |
 | `GET / PATCH / DELETE /api/goals/:goalId` | 取得（200）・編集（200。expectedGoalSettingsRevision必須、不一致409。設定／回答項目のないbody・nullableでない項目の`null`は422）。`targetDate`は暦にある`YYYY-MM-DD`で、変更後timezoneの今日より後だけ（違反は422）。`targetDate: null`は未設定に戻す。経過した保存日を維持する編集は`targetDate`を省略する（#157、P-19）。削除は204（記録も連鎖削除）。他人・存在しないidは404。記録履歴があるGoalの`timezone`変更は422 `GOAL_HAS_LOGS`。開始前合計の訂正は[D-34](#d-34-開始前の合計量の訂正319)の設定版CASで扱う（#319、ローカル） |
 | `PUT /api/goals/:goalId/logs/:localDate` | 記録の作成・上書き（200＋Log）。body：`status, expectedGoalSettingsRevision, amount`（DONE必須、SKIPPEDではamount禁止）。古い設定版は409。`localDate`がGoalのtimezoneで今日・昨日以外なら422 `LOG_DATE_OUT_OF_WINDOW`、固定した記録開始日より前なら422 `LOG_DATE_BEFORE_START`。どちらの違反でも記録・初期量を変更しない（#77） |
+| `PUT /api/goals/:goalId/logs/:localDate?view=change` | 上記保存と同じ条件で、Logに保存transactionの実増減・保存後履歴版を追加する（[D-35](#d-35-保存transactionの実増減244)）。query省略時のLogとGET応答は保持する |
 | `GET /api/goals/:goalId/logs?from&to` | 記録済みの一覧（行動日の昇順、両端を含む任意の期間。履歴表示用、#77） |
 | `GET /api/goals/:goalId/today` | query省略は`{ today, yesterday, todayLog, yesterdayMissing, prediction: PredictionResult }`。`yesterdayMissing`は昨日が記録開始日以降で未記録のときだけtrue。1つのDB snapshotと1回の時計読み取りから組み立てる（#77） |
 | `GET /api/goals/:goalId?view=r11` | 依頼者承認のR-11専用Goal DTO。raw回答・回答版を含む（#133）。query省略は旧Goal DTO。認証・owner条件、厳密queryの422は[D-26](#2026-10-07の保存予測接続133) |
@@ -968,6 +969,18 @@ D-248のGoal UUIDは既存Goal APIの大文字/小文字許可を保持し、補
 全Goalの足跡も既存の`monthCells`の月曜始まり・月初paddingを保持して7列へ配置する。14列の固定最小幅とスクロール位置の副作用を廃止し、上下キーを7日に揃える。日付の集計・timezone・未確認・単位量を合算しない条件は`buildFootprint`をそのまま使う。
 
 **Evidence：** [API回帰](../apps/api/tests/history-edit.test.ts)、[DB既定分離レベルとlock待ちの回帰](../apps/api/tests/history-edit-concurrency.test.ts)、[FE照合・累積回帰](../apps/web/tests/history-edit.test.mjs)、[履歴画面の寿命・所有者回帰](../apps/web/tests/history-lifecycle.browser.tsx)、[足跡の月配置・キー回帰](../apps/web/tests/footprint-calendar.browser.tsx)、[空グラフと日付進行・幅の回帰](../apps/web/tests/chart-rollover.browser.tsx)、既存Chrome回帰と[ローカル検証記録](changes/issue-319-goal-history.md)。テスト成功を本番採択や予測精度の証明にしない。
+
+### D-35 保存transactionの実増減（#244）
+
+2026-11-12 / **[P-27](product-spec.md#p-27-保存操作の実増減244)の依頼者指示に基づく実装。** 保存応答は変更量の確定元、再取得はその保存結果が現在表示できるかの確認元に分ける。
+
+- `PUT .../logs/:localDate?view=change`は通常のLogに`change`（goalId、previousAmount、amountDelta、totalRequired、unit、goalSettingsRevision、historyRevision）を追加する。省略時は既存のLogだけを返し、GET一覧やToday内のLogを変更しない。旧応答を受けたFEは保存成功を保持し、数値通知だけを省く。
+- 既存のowner付きGoal行lock・版照合・Goal timezoneの時計／日付窓を通した後、同じtransactionで対象日の旧DONE量を読み、新量で置き換え、triggerが進めた履歴版を読む。差は新DONE量−旧DONE量（SKIPPED／行なしは0）。commit成功後だけ返す。保存前の別HTTP取得や新規ledger・migrationは不要で、既存callerは追加読取も行わない。
+- FEは保存前の整合表示を境界確認に使うが、増減の計算元にはしない。保存後の整合表示・保存行・履歴版・設定版・単位・総量を`change`と照合し、別保存が介在した結果を今回の通知へ混ぜない。owner/訪問境界、再試行抑止、同tab通知と再取得失敗の扱いを保持する。
+
+採択理由は、同じlock内で旧量と保存後版を確定でき、既存のCASとDB schemaを保ったままP-27を満たせるため。表示snapshot差分は別端末の直前量を証明できず、常時数値を消す案は選択された表示要件を満たさない。全PUT応答の一律変更は既存callerの形を壊すため明示queryを使う。永続receiptによる論理操作の再送再現は対象外で、応答喪失後の再試行では数値を出さない。常時の数値通知や再送でも元の差分を出す要件になった場合にledgerを再検討する。
+
+API/DB・ブラウザ・実API縦断の回帰と限界は[既存#244記録](changes/issue-244-goal-feedback.md)。保存の純増は予測精度・人間の理解・公開運用受入の証明ではない。
 
 ### D-34 開始前の合計量の訂正（#319）
 

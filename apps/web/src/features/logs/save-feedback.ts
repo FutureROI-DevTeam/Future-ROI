@@ -1,4 +1,4 @@
-import type { GoalR11, Log, TodayR11 } from '@contracts';
+import type { GoalR11, Log, LogSaveResult, TodayR11 } from '@contracts';
 import { isSameSnapshot } from '../today/snapshot.ts';
 
 export type FeedbackSnapshot = { goal: GoalR11; today: TodayR11; logs: Log[] };
@@ -13,8 +13,16 @@ const logValue = (log: Log | undefined) => log?.status === 'DONE' ? log.amount ?
 const sameLog = (x: Log | undefined, y: Log) => x?.localDate === y.localDate && x.status === y.status && x.amount === y.amount;
 const otherLogs = (logs: Log[], date: string) => JSON.stringify(logs.filter(l => l.localDate !== date).sort((a, b) => a.localDate.localeCompare(b.localDate)));
 
-/** 取得済みの整合したsnapshot同士の差。別端末が介在したときの今回のPUTの増分は証明できない。 */
-export function confirmedSaveFeedback(before: FeedbackSnapshot, after: FeedbackSnapshot, saved: Log): SaveFeedback | null {
+/** 保存transactionが確定した差分だけを、同じ保存結果の再取得後に通知する。 */
+export function confirmedSaveFeedback(before: FeedbackSnapshot, after: FeedbackSnapshot, saved: LogSaveResult): SaveFeedback | null {
+  const change = saved.change;
+  if (!change || change.goalId !== before.goal.id || change.unit !== after.goal.unit
+    || change.totalRequired !== after.goal.totalRequired
+    || change.goalSettingsRevision !== after.goal.goalSettingsRevision
+    || change.historyRevision !== after.goal.historyRevision
+    || !Number.isSafeInteger(change.previousAmount) || change.previousAmount < 0
+    || !Number.isSafeInteger(change.amountDelta)
+    || logValue(saved) - change.previousAmount !== change.amountDelta) return null;
   if (!isSameSnapshot(before.goal, before.today, before.logs)
     || !isSameSnapshot(after.goal, after.today, after.logs)) {
     return null;
@@ -43,14 +51,8 @@ export function confirmedSaveFeedback(before: FeedbackSnapshot, after: FeedbackS
   if (otherLogs(before.logs, saved.localDate) !== otherLogs(after.logs, saved.localDate)) {
     return null;
   }
-  if (before.goal.historyRevision !== undefined || after.goal.historyRevision !== undefined) {
-    if (before.goal.historyRevision === undefined || after.goal.historyRevision === undefined
-      || BigInt(after.goal.historyRevision) !== BigInt(before.goal.historyRevision) + 1n) return null;
-  }
-  const amount = logValue(saved) - logValue(before.logs.find(l => l.localDate === saved.localDate));
-  if (after.today.prediction.progress.done - before.today.prediction.progress.done !== amount) {
-    return null;
-  }
+  // beforeの同日量・履歴版は別端末より古い場合がある。増減をその値から逆算しない。
+  const amount = change.amountDelta;
   // 同値の再保存には加算表示しない。SKIPPED新規も量は0のまま。
   if (amount === 0) {
     return null;

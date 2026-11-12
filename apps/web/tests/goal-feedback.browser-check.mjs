@@ -375,7 +375,7 @@ test('#244: real form/Today at 320/390/768/1440, native input, confirmed feedbac
   const saved = await until(state, v => v?.feedback?.includes('+0.25パーセントポイント'), 'confirmed +0.25 points absent');
   assert.equal(saved.puts.length, 1);
   assert.ok(saved.feedback.includes('+30分'));
-  assert.ok(saved.feedback.includes('保存前の表示との差'));
+  assert.ok(saved.feedback.includes('今回の保存による増減'));
   assert.equal(await evaluate('document.querySelector(".fr-save-feedback").getBoundingClientRect().height'), feedbackHeight, 'feedback must not shift the layout');
   assert.equal(saved.active, 'fr-recorded-title', 'save must restore the recorded heading focus');
   await delay(400); // .35sの登場アニメーション終了後の色をレビューPNGに残す。
@@ -389,6 +389,16 @@ test('#244: real form/Today at 320/390/768/1440, native input, confirmed feedbac
   assert.equal(await evaluate('!!document.querySelector(".fr-save-feedback__increase")'), false);
   await screenshot('today-correction-390');
   evidence.push({ mode: 'correction', ...corrected });
+  await mount('today-stale');
+  await evaluate('window.__goalQA.otherDeviceSave(40)');
+  await click('[...document.querySelectorAll("button")].find(e=>e.textContent.trim()==="記録を変更")');
+  for (let i = 0; i < 2; i++) await click('document.querySelector(".fr-today__dock button[aria-label^=量を増やす]")');
+  await activate('.fr-today__dock .fr-choice');
+  const actualDelta = await until(state, v => v?.feedback?.includes('−10分'), 'DB receipt must beat stale display +10');
+  assert.equal(actualDelta.logs.find(l => l.localDate === actualDelta.puts[0].localDate).amount, 30);
+  assert.equal(await evaluate('!!document.querySelector(".fr-save-feedback__increase")'), false);
+  await screenshot('today-actual-decrease-390');
+  evidence.push({ mode: 'old display 20 / server 40 / save 30 gives -10', ...actualDelta });
   await mount('today'); await evaluate('window.__goalQA.failure("offline")');
   await activate('.fr-today__dock .fr-choice');
   const failed = await until(state, v => v?.puts?.length === 1 && v?.text?.includes('もう一度'), 'failure absent');

@@ -1,7 +1,7 @@
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
-import { ErrorBody, Log, LogList, LogParams, LogPut, LogsQuery } from '../contracts/index.ts';
+import { ErrorBody, LogSaveResult, LogSaveQuery, LogList, LogParams, LogPut, LogsQuery } from '../contracts/index.ts';
 import { HistoryEdit, HistoryEditResult } from '../contracts/log.ts';
 import { GoalParams } from '../contracts/goal.ts';
 import { isCalendarDate } from '../goals/local-date.ts';
@@ -22,7 +22,7 @@ export async function registerLogRoutes(app: FastifyInstance, deps: LogRouteDeps
 
     api.put(
       '/api/goals/:goalId/logs/:localDate',
-      { schema: { params: LogParams, body: LogPut, response: { 200: Log, 404: ErrorBody, 409: ErrorBody, 422: ErrorBody } } },
+      { schema: { params: LogParams, querystring: LogSaveQuery, body: LogPut, response: { 200: LogSaveResult, 404: ErrorBody, 409: ErrorBody, 422: ErrorBody } } },
       async (request, reply) => {
         const { goalId, localDate } = request.params;
         if (!isCalendarDate(localDate)) return reply.code(422).send(invalidDate('params/localDate'));
@@ -32,10 +32,10 @@ export async function registerLogRoutes(app: FastifyInstance, deps: LogRouteDeps
             errorBody('VALIDATION_ERROR', 'Request does not match the contract.', [{ path: 'body/amount', message: 'must be omitted when status is SKIPPED' }]),
           );
         }
-        const result = await putLog(deps.pool, request.userId, goalId, localDate, request.body, deps.now);
+        const result = await putLog(deps.pool, request.userId, goalId, localDate, request.body, deps.now, request.query.view === 'change');
         switch (result.kind) {
           case 'saved':
-            return result.log;
+            return { ...result.log, ...(result.change ? { change: result.change } : {}) };
           case 'history_conflict':
             return reply.code(409).send(errorBody('HISTORY_CONFLICT', 'Records changed. Reload before explicitly saving again.'));
           case 'settings_conflict':

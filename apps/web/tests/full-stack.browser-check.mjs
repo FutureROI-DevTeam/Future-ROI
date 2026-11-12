@@ -221,6 +221,7 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
     assert.equal(initial.prediction.observations.recordedDays, 0);
     await until('document.querySelector(".fr-core__value")?.textContent === "約1日"', 'calculated core metric reaches UI');
     await saveAmount(7);
+    await until('document.querySelector(".fr-save-feedback")?.textContent.includes("+7分")', 'server-confirmed first increment');
     await waitForRecord(goalA.id, 'DONE', 7);
     await openGoal(goalA.id); // A new document must re-read DB, not reuse the in-memory query cache.
     await assertProgress(goalA.id, 12);
@@ -340,5 +341,56 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
     await assertProgress(goalA.id, 25);
     await openGoal(recoveryGoal.id);
     await assertProgress(recoveryGoal.id, 10);
+  });
+
+  await t.test('#244 actual save deltas and lost PUT response do not repeat an increment', async () => {
+    await openGoal(recoveryGoal.id);
+    const current = await read(`/api/goals/${recoveryGoal.id}?view=r11`);
+    const path = `/api/goals/${recoveryGoal.id}/logs/${current.today}`;
+    // A real independent write. Reload explicitly, retaining the existing history CAS.
+    assert.equal((await api('PUT', path, { status: 'DONE', amount: 40, expectedGoalSettingsRevision: current.goalSettingsRevision })).status, 200);
+    await openGoal(recoveryGoal.id);
+    await changeRecord();
+    await saveAmount(30);
+    await until('document.querySelector(".fr-save-feedback")?.textContent.includes("−10分")', 'real DB 40 to 30 must report -10');
+    assert.equal(await evaluate('!!document.querySelector(".fr-save-feedback__increase")'), false);
+    await waitForRecord(recoveryGoal.id, 'DONE', 30);
+
+    await changeRecord();
+    await clickText('量を変更');
+    await input('.fr-amount input', 50);
+    let lost = false;
+    const intercept = event => {
+      const message = JSON.parse(String(event.data));
+      if (message.method !== 'Fetch.requestPaused') return;
+      const paused = message.params;
+      void (async () => {
+        if (!lost && paused.request.method === 'PUT' && new URL(paused.request.url).pathname === path) {
+          assert.equal(paused.responseStatusCode, 200);
+          lost = true;
+          await cdp.send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'Aborted' });
+        } else await cdp.send('Fetch.continueRequest', { requestId: paused.requestId });
+      })().catch(error => { interceptionError = error; });
+    };
+    cdp.socket.addEventListener('message', intercept);
+    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: origin + path + '*', requestStage: 'Response' }] });
+    try {
+      await clickText('この量で記録');
+      await until(`(${visible})(${button('もう一度保存')})`, 'lost PUT response recovery');
+      await waitForRecord(recoveryGoal.id, 'DONE', 50);
+      assert.equal(await evaluate('document.querySelector(".fr-save-feedback")?.textContent'), '');
+      await clickText('もう一度保存');
+      // The original version is now stale; explicit reload is still required.
+      await until(`document.body.textContent.includes('最新の設定を取得')`, 'lost response must retain history conflict protection');
+      assert.equal(await evaluate('document.querySelector(".fr-save-feedback")?.textContent'), '');
+      await clickText('最新の設定を取得');
+      await clickText('この量で再保存');
+      await waitForRecord(recoveryGoal.id, 'DONE', 50);
+      await until('!!document.querySelector("#fr-recorded-title")', 'PUT recovery completed');
+      assert.equal(await evaluate('document.querySelector(".fr-save-feedback")?.textContent'), '', 'retry cannot repeat +20');
+    } finally {
+      await cdp.send('Fetch.disable');
+      cdp.socket.removeEventListener('message', intercept);
+    }
   });
 });

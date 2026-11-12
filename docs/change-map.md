@@ -229,6 +229,8 @@ TodayのP80計算範囲の文言（[#154](https://github.com/jogi-hack-2026-team
 
 ## GoalとTodayの量入力・保存後表示（#244）
 
+保存後の実増減（[P-27](product-spec.md#p-27-保存操作の実増減244)・[D-35](architecture.md#d-35-保存transactionの実増減244)）は、[Log保存応答](../apps/api/src/contracts/log.ts) → [Goal lock内の旧量と保存後版](../apps/api/src/logs/store.ts) → [明示query](../apps/api/src/logs/routes.ts) → [HTTP client](../apps/web/src/api/today-http.ts) → [通知の照合](../apps/web/src/features/logs/save-feedback.ts)で追う。[実DB回帰](../apps/api/tests/log-change.test.ts)、既存の[FE固定値回帰](../apps/web/tests/goal-feedback.test.mjs)・[実Chrome回帰](../apps/web/tests/goal-feedback.browser-check.mjs)・[実SPA/API/DB](../apps/web/tests/full-stack.browser-check.mjs)が確認入口。旧snapshot差分の説明はP-23当時の履歴として読む。
+
 [Product P-23](product-spec.md#p-23-goalの量入力と保存後の増分244) → [量入力](../apps/web/src/features/goals/form/TimeAmountField.tsx)・[draftと整数変換](../apps/web/src/features/goals/goal-form.ts) → [増分確認](../apps/web/src/features/logs/save-feedback.ts)・[保存hook](../apps/web/src/features/logs/useSaveLog.ts) → [Today配置](../apps/web/src/features/today/TodayPage.tsx)・[グラフ座標](../apps/web/src/features/today/chart-geometry.ts)で追跡する。保存済み実績・設定量・未保存入力を分ける。API・DB・Engine・CI設定は変更しない。
 
 [純粋境界回帰](../apps/web/tests/goal-feedback.test.mjs)、[実Chromeの画面・操作回帰](../apps/web/tests/goal-feedback.browser-check.mjs)、[検証範囲と残判断](changes/issue-244-goal-feedback.md)へ参照する。P-18採択当時の入力限定をP-23が追加する。既存の[#157検証](changes/issue-157-review-regression.md)は当時の記録として保ち、同日並行上書きの差分保証や人間の受入を完了扱いにしない。

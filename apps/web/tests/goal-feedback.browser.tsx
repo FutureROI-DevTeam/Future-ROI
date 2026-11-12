@@ -23,7 +23,7 @@ const date = new Date().toISOString().slice(0, 10);
 const shift = (n: number) => new Date(Date.parse(date + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
 const base = { id: 'qa-goal', title: '英語学習の積み上げ', unit: 'minutes', totalRequired: 12000, sessionAmount: 30,
   initialProgress: 0, timezone: 'UTC', recordStartDate: shift(-28), hasLogs: true, unitLocked: true,
-  goalSettingsRevision: 0, answerRevision: 0, today: date, targetDate: null, questionPrior: { a: null, b: null }, schemaVersion: 'r11-v1' };
+  goalSettingsRevision: 0, answerRevision: 0, historyRevision: '0', today: date, targetDate: null, questionPrior: { a: null, b: null }, schemaVersion: 'r11-v1' };
 let logs: { localDate: string; status: string; amount: number | null }[] = [];
 let failure: 'offline' | '409' | null = null;
 let puts: unknown[] = [];
@@ -49,7 +49,7 @@ const today = () => {
       completion: { status: 'available', scenario: todayLog ? 'CURRENT_STATE' : 'TODAY_DONE', p50Days: 300, p80Days: 450 },
       config: { samples: 200, horizonDays: 1095, seed: 244 } },
     context: { recordStartDate: g.recordStartDate, unit: g.unit, sessionAmount: g.sessionAmount,
-      goalSettingsRevision: g.goalSettingsRevision, answerRevision: g.answerRevision, unitLocked: g.unitLocked },
+      goalSettingsRevision: g.goalSettingsRevision, answerRevision: g.answerRevision, historyRevision: g.historyRevision, unitLocked: g.unitLocked },
     provenance: { a: 'RECORDS', b: 'RECORDS' }, plan: null };
 };
 goalsHttp.getGoal = async () => structuredClone(goal()) as never;
@@ -68,8 +68,13 @@ todayHttp.putLog = async (_id, localDate, body) => {
   if (failure === 'offline') throw new TypeError('synthetic offline');
   if (failure === '409') throw new ApiError(409, { error: { code: 'GOAL_SETTINGS_CONFLICT', message: 'synthetic 409' } });
   const saved = { localDate, status: body.status, amount: body.status === 'DONE' ? body.amount : null };
+  const previous = logs.find(l => l.localDate === localDate);
+  const previousAmount = previous?.status === 'DONE' ? previous.amount ?? 0 : 0;
+  if (!previous || previous.status !== saved.status || previous.amount !== saved.amount) base.historyRevision = String(BigInt(base.historyRevision) + 1n);
   logs = [...logs.filter(l => l.localDate !== localDate), saved];
-  return structuredClone(saved) as never;
+  return structuredClone({ ...saved, change: { goalId: base.id, previousAmount,
+    amountDelta: (saved.amount ?? 0) - previousAmount, totalRequired: base.totalRequired, unit: base.unit,
+    goalSettingsRevision: base.goalSettingsRevision, historyRevision: base.historyRevision } }) as never;
 };
 globalThis.fetch = async () => Response.json({ enabled: false, policyVersion: 'self-evaluation-v1', retentionDays: 90, maxSnapshots: 90, observationDays: 30 });
 const root = createRoot(document.getElementById('app')!);
@@ -89,6 +94,7 @@ function mount(mode: string) {
   base.sessionAmount = 30;
   base.goalSettingsRevision = 0;
   base.answerRevision = 0;
+  base.historyRevision = '0';
   logs = Array.from({ length: 28 }, (_, i) => ({ localDate: shift(i - 28), status: i % 2 ? 'DONE' : 'SKIPPED', amount: i % 2 ? 30 : null }));
   if (mode === 'today-small' || mode === 'list-small') {
     base.totalRequired = 18000;
@@ -102,6 +108,7 @@ function mount(mode: string) {
     logs = [{ localDate: date, status: 'DONE', amount: 3 }];
   }
   if (mode === 'today-empty') logs = [];
+  if (mode === 'today-stale') logs = [{ localDate: date, status: 'DONE', amount: 20 }];
   if (mode === 'edit') base.initialProgress = 1240; else base.initialProgress = 0;
   base.hasLogs = mode !== 'edit';
   base.unitLocked = mode !== 'today-empty';
@@ -114,6 +121,7 @@ function mount(mode: string) {
   failure: (value: typeof failure) => { failure = value; },
   hold: () => { hold = true; },
   release: () => { hold = false; held.splice(0).forEach(resolve => resolve()); },
+  otherDeviceSave: (amount: number) => { logs = [...logs.filter(l => l.localDate !== date), { localDate: date, status: 'DONE', amount }]; base.historyRevision = String(BigInt(base.historyRevision) + 1n); },
   configure: (settings: Partial<typeof base>) => { Object.assign(base, settings); void client.invalidateQueries({ queryKey: ['goals'] }); },
   historyOffline: (id: string | null, refresh = true) => { historyFailure = id; if (refresh) void client.invalidateQueries({ queryKey: ['goals'] }); },
   releaseHistory: () => { historyHold = false; heldHistory.splice(0).forEach(resolve => resolve()); },
