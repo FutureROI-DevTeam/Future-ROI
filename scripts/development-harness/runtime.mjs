@@ -25,17 +25,22 @@ export function validateProposal(p) {
   return p;
 }
 
-export function containerState(name) {
+export function timeRemaining(deadline, now = Date.now()) {
+  if (deadline <= now) { throw new Error('attempt-time-budget'); }
+  return Math.min(15000, deadline - now);
+}
+
+export function containerState(name, deadline = Date.now() + 15000) {
   // Failure (including daemon outage and absent container) is UNKNOWN, never proof of exit.
-  const data = JSON.parse(command('docker', ['inspect', name]))[0];
+  const data = JSON.parse(command('docker', ['inspect', name], { timeout: timeRemaining(deadline) }))[0];
   if (data.Name !== '/' + name || data.Config.Labels?.['future-roi-harness'] !== name) { throw new Error('container-identity'); }
   return data.State;
 }
 
-export function stopAndConfirm(name) {
-  const before = containerState(name);
-  if (before.Running) { command('docker', ['stop', '--time', '1', name]); }
-  const after = containerState(name);
+export function stopAndConfirm(name, deadline = Date.now() + 15000) {
+  const before = containerState(name, deadline);
+  if (before.Running) { command('docker', ['stop', '--time', '1', name], { timeout: timeRemaining(deadline) }); }
+  const after = containerState(name, deadline);
   if (after.Running || !['exited', 'created'].includes(after.Status)) { throw new Error('stop-unconfirmed'); }
   return after;
 }
@@ -78,6 +83,9 @@ export function runOne(directory, batchId, proposal) {
   const base = git(['rev-parse', 'HEAD']);
   // Read committed baseline code only; never mount checkout/.git/HOME/socket into the worker.
   const baseline = git(['show', `${base}:${candidatePath}`]) + '\n';
+  // Known prerequisites fail before reservation. Uncertain create results still occupy a slot.
+  command('docker', ['info', '--format', '{{.ServerVersion}}']);
+  command('docker', ['image', 'inspect', image]);
   const attempt = transaction(directory, s => {
     reserve(s, id, name);
     return { number: s.tasks[id].attempts, ms: s.batches[batchId].contract.attemptMs, startedAt: s.tasks[id].active.startedAt };
@@ -99,17 +107,14 @@ export function runOne(directory, batchId, proposal) {
     writeFileSync(join(policy, file), command('git', ['show', `${base}:.github/scripts/${file}`]));
   }
   const started = attempt.startedAt;
+  const deadline = started + attempt.ms;
   let diagnostic = 'runtime-or-verification-failure';
   let passed = false;
   let head = null;
   let record = null;
   let isolation = null;
   let created = false;
-  const remaining = () => {
-    const ms = attempt.ms - 15000 - (Date.now() - started);
-    if (ms <= 0) { throw new Error('attempt-time-budget'); }
-    return Math.min(ms, 15000);
-  };
+  const remaining = () => timeRemaining(deadline - 15000);
   const exec = args => command('docker', ['exec', name, ...args], { timeout: remaining() });
   try {
     command('docker', ['create', '--name', name, '--label', `future-roi-harness=${name}`, '--pull', 'never',
@@ -139,19 +144,21 @@ export function runOne(directory, batchId, proposal) {
     const observed = JSON.parse(exec(['node', '/input/answer.mjs', JSON.stringify(cases)]));
     if (JSON.stringify(observed) !== JSON.stringify(cases.map(([a, b]) => a + b))) { throw new Error('behavior-failed'); }
     const exported = proposal.files[candidatePath];
-    stopAndConfirm(name);
+    stopAndConfirm(name, deadline);
     // Candidate termination is confirmed before trusted Git object construction / artifact writes.
-    if (transaction(directory, s => s.tasks[id].cancelRequested)) { throw new Error('cancelled'); }
+    if (transaction(directory, s => s.tasks[id].cancelRequested || s.tasks[id].active?.container !== name)) { throw new Error('cancelled'); }
     const index = join(folder, 'index');
     const env = { ...cleanEnv(), GIT_INDEX_FILE: index, GIT_AUTHOR_NAME: 'Future ROI fixture',
       GIT_AUTHOR_EMAIL: 'fixture@example.invalid', GIT_COMMITTER_NAME: 'Future ROI fixture', GIT_COMMITTER_EMAIL: 'fixture@example.invalid' };
-    const blob = git(['hash-object', '-w', '--stdin'], { input: exported, env });
-    git(['read-tree', base], { env });
-    git(['update-index', '--add', '--cacheinfo', `100644,${blob},${candidatePath}`], { env });
-    const tree = git(['write-tree'], { env });
-    head = git(['commit-tree', tree, '-p', base, '-m', 'test: 隔離fixtureの整数加算を修正する'], { env });
-    writeFileSync(join(folder, 'candidate.patch'), command('git', ['diff', '--binary', base, head]));
+    const boundedGit = (args, options = {}) => git(args, { ...options, env, timeout: timeRemaining(deadline) });
+    const blob = boundedGit(['hash-object', '-w', '--stdin'], { input: exported });
+    boundedGit(['read-tree', base]);
+    boundedGit(['update-index', '--add', '--cacheinfo', `100644,${blob},${candidatePath}`]);
+    const tree = boundedGit(['write-tree']);
+    head = boundedGit(['commit-tree', tree, '-p', base, '-m', 'test: 隔離fixtureの整数加算を修正する']);
+    writeFileSync(join(folder, 'candidate.patch'), command('git', ['diff', '--binary', base, head], { timeout: timeRemaining(deadline) }));
     writeFileSync(join(folder, 'draft-pr.md'), `## 何を変えたか\n\n整数加算fixtureを修正したローカル比較成果物。実Issueの完了ではありません。\n\n## 検証\n\n- 外側の整数出力照合、隔離書込み拒否、既存ci-report回帰: 成功\n- baseline/checkout: ${base}\n- candidate commit: ${head}\n- PR後CI: 未実行。Draft未発行。レビュー可能ではありません。\n- 総費用・人の時間: 未計測。新規モデル/API呼出しなし。\n\n## 関連Issue\n\nRefs #340（ハーネス実装PRとは別の実証用成果物）\n`);
+    timeRemaining(deadline);
     diagnostic = 'none';
     passed = true;
   } catch (error) {
@@ -162,12 +169,14 @@ export function runOne(directory, batchId, proposal) {
   }
   let stopped = false;
   if (created) {
-    try { stopAndConfirm(name); stopped = true; } catch { /* Occupy the slot until explicit recovery. */ }
+    try { stopAndConfirm(name, deadline); stopped = true; } catch { /* Occupy the slot until explicit recovery. */ }
   }
   const receipt = { container: name, stopped, passed: passed && stopped, diagnostic, head,
     baselineSha: base, candidateDigest: digest(proposal), isolation, existingCheck: record,
     image, externalCI: 'not-run', totalCostCents: null, incrementalBillableCalls: 0 };
   writeFileSync(join(results, 'result.json'), JSON.stringify(receipt, null, 2) + '\n');
-  if (stopped) { transaction(directory, s => finish(s, id, receipt)); }
+  if (stopped) { transaction(directory, s => {
+    if (s.tasks[id].active?.container === name) { finish(s, id, receipt); }
+  }); }
   return { id, state: stopped ? transaction(directory, s => s.tasks[id].state) : 'stop-unconfirmed', folder };
 }

@@ -84,6 +84,8 @@ API テストはテスト用 PostgreSQL を使用します。shell の `DATABASE
 
 ### 開発基盤のセットアップと確認
 
+許可済み有限作業のローカル比較入口は[開発ハーネス](docs/operations/development-harness.md)を参照してください。現在は無害なfixtureの隔離検証とDraft用成果物までで、実Issueの自律実装・自動発行は有効化していません。
+
 文書・リンクと図の検査は PowerShell 7 で実行できます。
 
 ```powershell

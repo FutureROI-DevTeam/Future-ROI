@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as h from './state.mjs';
-import { validateProposal, candidatePath } from './runtime.mjs';
+import { validateProposal, candidatePath, timeRemaining } from './runtime.mjs';
 
 const contract = () => JSON.parse(readFileSync(new URL('./example-contract.json', import.meta.url)));
 const setup = () => { const c = contract(); const s = h.emptyLedger(); h.enroll(s, c, 0); return { s, c, id: c.tasks[0].id }; };
@@ -86,6 +86,33 @@ test('レビュー中のheadはOptionalで変わらず、対象headへの必須�
   assert.equal(s.tasks[id].state, 'repair-authorized');
   assert.equal(s.tasks[id].head, sha);
   assert.equal(s.tasks[id].attempts, 1);
+});
+
+test('AR-01: cancel/resumeはレビュー待ち・受入済みheadの修復許可にならない', () => {
+  for (const state of ['artifacts-ready', 'review-ready', 'accepted']) {
+    const { s, c, id } = setup(); pass(s, id); s.tasks[id].state = state;
+    h.requestCancel(s, id); h.requestCancel(s, id); h.resumeCancelled(s, id);
+    assert.equal(s.tasks[id].state, state);
+    assert.equal(s.tasks[id].repair, null);
+    assert.equal(h.nextTask(s, c.batchId, 3).id, undefined);
+    assert.equal(s.tasks[id].head, sha);
+  }
+  const { s, c, id } = setup();
+  h.requestCancel(s, id); h.resumeCancelled(s, id);
+  assert.equal(h.nextTask(s, c.batchId, 1).id, id);
+});
+
+test('AR-02: 期限残量に収まらない開始を拒否し、安全終了の超過も累積へ加算', () => {
+  const { s, c, id } = setup();
+  assert.equal(h.nextTask(s, c.batchId, c.lifetimeMs - 1).reason, 'lifetime-budget');
+  assert.throws(() => h.reserve(s, id, 'late', c.lifetimeMs - 1));
+  h.reserve(s, id, 'one', 1);
+  h.finish(s, id, { container: 'one', stopped: true, passed: false }, 70001);
+  assert.equal(s.tasks[id].reservedMs, 70000);
+  assert.equal(s.batches[c.batchId].reservedMs, 70000);
+  assert.equal(timeRemaining(1000, 999), 1);
+  assert.throws(() => timeRemaining(1000, 1000), /time-budget/);
+  assert.equal(timeRemaining(30000, 1), 15000);
 });
 
 test('応答喪失は再書込みより照合。0件・多件・別headを成功としない', () => {

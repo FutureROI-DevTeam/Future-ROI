@@ -61,7 +61,7 @@ export function nextTask(s, batchId, now = Date.now()) {
   const b = s.batches[batchId];
   insist(b, 'unknown-batch');
   if (Object.values(s.tasks).some(t => t.active)) { return { reason: 'worker-stop-unconfirmed' }; }
-  if (now >= b.expiresAt) { return { reason: 'lifetime-budget' }; }
+  if (now + b.contract.attemptMs > b.expiresAt) { return { reason: 'lifetime-budget' }; }
   for (const spec of b.contract.tasks) {
     const t = s.tasks[spec.id];
     if (!['eligible', 'repair-authorized'].includes(t.state) || t.cancelRequested || t.writeIntent) { continue; }
@@ -90,6 +90,7 @@ export function reserve(s, id, container, now = Date.now()) {
 
 export function requestCancel(s, id) {
   insist(s.tasks[id], 'unknown-task');
+  if (!s.tasks[id].cancelRequested) { s.tasks[id].cancelState = s.tasks[id].state; }
   s.tasks[id].cancelRequested = true;
   s.tasks[id].resumeReason = 'confirm-container-stopped-before-resume';
 }
@@ -97,7 +98,12 @@ export function requestCancel(s, id) {
 export function finish(s, id, receipt, now = Date.now()) {
   const t = s.tasks[id];
   insist(t?.active && receipt.container === t.active.container && receipt.stopped === true, 'stop-unconfirmed');
-  t.actualMs += Math.max(0, now - t.active.startedAt);
+  const elapsed = Math.max(0, now - t.active.startedAt);
+  t.actualMs += elapsed;
+  const b = s.batches[t.batchId];
+  const overrun = Math.max(0, elapsed - b.contract.attemptMs);
+  t.reservedMs += overrun;
+  b.reservedMs += overrun;
   t.active = null;
   t.receipts.push(receipt);
   if (receipt.passed && !t.cancelRequested) {
@@ -127,7 +133,9 @@ export function resumeCancelled(s, id) {
   const t = s.tasks[id];
   insist(t?.cancelRequested && !t.active && !t.writeIntent, 'stop-or-write-unconfirmed');
   t.cancelRequested = false;
-  t.state = 'repair-authorized';
+  // Cancellation is not a mandatory change request. Preserve frozen/accepted heads.
+  t.state = t.cancelState === 'implementing' ? 'repair-authorized' : t.cancelState;
+  t.cancelState = null;
 }
 
 // Protocol tests only; no network writer exists. An ambiguous write always needs reconciliation.
@@ -174,6 +182,16 @@ export function acceptFixture(s, id) {
   insist(t?.state === 'artifacts-ready' && !t.active && !t.writeIntent && !t.cancelRequested, 'artifact-not-reviewable');
   t.state = 'accepted';
   t.resumeReason = 'local-fixture-accepted; no-real-issue-closed';
+}
+
+export function recordMetrics(s, values) {
+  insist(values && Object.keys(values).length > 0, 'metrics-required');
+  for (const [key, value] of Object.entries(values)) {
+    insist(Object.hasOwn(s.metrics, key), 'unknown-metric');
+    insist(value === null || (key === 'acceptedValue' ? typeof value === 'string' && value.length <= 300 :
+      typeof value === 'number' && Number.isFinite(value) && value >= 0), 'invalid-metric');
+  }
+  Object.assign(s.metrics, values);
 }
 
 export function initialize(directory) {

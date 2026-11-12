@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { initialize, transaction, enroll, nextTask, requestCancel, resumeCancelled, authorizeRepair, acceptFixture } from './state.mjs';
+import { initialize, transaction, enroll, nextTask, requestCancel, resumeCancelled, authorizeRepair, acceptFixture, recordMetrics } from './state.mjs';
 import { runOne, recover } from './runtime.mjs';
 
 const [action, directory, target, input] = process.argv.slice(2);
@@ -11,6 +11,7 @@ try {
     case 'init': initialize(directory); result = { state: 'initialized' }; break;
     case 'enroll': transaction(directory, s => enroll(s, json(target))); result = { state: 'enrolled' }; break;
     case 'status': result = transaction(directory, s => s); break;
+    case 'measure': transaction(directory, s => recordMetrics(s, json(target))); result = { state: 'metrics-recorded' }; break;
     case 'cancel': transaction(directory, s => requestCancel(s, target)); result = { state: 'cancel-requested' }; break;
     case 'recover': recover(directory, target); result = { state: 'stopped; awaiting-decision' }; break;
     case 'resume': transaction(directory, s => resumeCancelled(s, target)); result = { state: 'resume-authorized' }; break;
@@ -26,7 +27,7 @@ try {
         if (!proposals[next.id]) { results.push({ reason: 'proposal-required', id: next.id }); break; }
         const outcome = runOne(directory, target, proposals[next.id]);
         results.push(outcome);
-        if (outcome.state !== 'artifacts-ready') { break; }
+        if (outcome.state !== 'artifacts-ready') { process.exitCode = 1; break; }
       }
       result = results;
       break;

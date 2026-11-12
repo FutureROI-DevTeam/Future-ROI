@@ -30,6 +30,8 @@ jobs:
         run: node .github/scripts/ci-report.mjs run foundation -- npm run verify:foundation
       - name: Check diagram synchronization regressions
         run: pwsh -NoProfile -File ./scripts/tests/check-document-diagrams.test.ps1
+      - name: Check finite development harness contracts
+        run: node --test scripts/development-harness/state.test.mjs
       - name: Summarize verification
         if: ${{ always() }}
         run: node .github/scripts/ci-report.mjs summary foundation

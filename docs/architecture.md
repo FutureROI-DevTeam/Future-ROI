@@ -691,6 +691,16 @@ resetは同ユーザーの初回にも効くtransaction advisory lock→認証us
 
 ## Architecture Decision Log
 
+### D-36 有限開発ハーネスのローカル比較（#340）
+
+**状態：LIMITED TRIAL。** 2026-11-12の依頼はハーネス実装・隔離fixture・独立レビューまでを許可する。AW採択、実Issueの無人運用、権限・課金追加、merge・本番配備の採択ではない。
+
+既存Codex＋Skillsが準備する差分を、有限契約・host台帳・Docker隔離検証・Draft用成果物へつなぐ小さい入口を比較する。候補はpolicy、検査入口、結果保存先を書換えられず、host側で実出力を照合する。目的は誤完了・重複・復旧・レビュー負担を抑えた実行経路の検証で、製品仕様を変更しない。
+
+代替のAW＋Codexは、固定版の認証と利用枠・生成lockの検証条件が揃わず見送り。旧ML runnerの復活や独自scheduler/DB/汎用publisherは必要な最小経路を超えるため追加しない。現在はfixture専用という制約があり、人の時間・総費用の削減も未実証。境界を満たせない場合は実接続を止め、設定コストが削減分を超える場合は縮小する。
+
+契約・不変条件・起動/停止/復旧・再検討条件は[運用手順](operations/development-harness.md)、比較根拠・試験と独立レビューは[検証記録](changes/issue-340-development-harness.md)に残す。
+
 | ID | 日付 | 状態 | 判断 |
 | --- | --- | --- | --- |
 | D-15 | 2026-09-27 | SUPERSEDED by D-18 | 当時の[Node 24 LTS / npm](#d-15)採択 |
