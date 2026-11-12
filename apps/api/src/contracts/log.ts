@@ -20,6 +20,22 @@ export const Log = Type.Object(
 );
 export type Log = Static<typeof Log>;
 
+// #244: Goal行のlock内で確定した今回の保存の差分。読み取りDTOには含めない。
+export const LogChange = Type.Object({
+  goalId: Type.String(),
+  previousAmount: Type.Integer({ minimum: 0, maximum: INT4_MAX }),
+  amountDelta: Type.Integer({ minimum: -INT4_MAX, maximum: INT4_MAX }),
+  totalRequired: Type.Integer({ minimum: 1, maximum: INT4_MAX }),
+  unit: Type.Union([Type.Literal('minutes'), Type.Literal('sessions')]),
+  goalSettingsRevision: GoalSettingsRevision,
+  historyRevision: Type.String({ pattern: '^[0-9]+$' }),
+}, strict);
+export type LogChange = Static<typeof LogChange>;
+// changeなしは旧APIとの互換用。FEは保存を成功にしても増分を推測しない。
+export const LogSaveResult = Type.Object({ ...Log.properties, change: Type.Optional(LogChange) }, strict);
+export type LogSaveResult = Static<typeof LogSaveResult>;
+export const LogSaveQuery = Type.Object({ view: Type.Optional(Type.Literal('change')) }, strict);
+
 export const LogList = Type.Array(Log);
 
 // #148: DONEは表示量を必ず送り、設定版で古い画面からの保存を拒否する。SKIPPEDに量を送らない。

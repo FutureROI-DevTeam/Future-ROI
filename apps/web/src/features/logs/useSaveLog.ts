@@ -21,7 +21,7 @@ export type SaveVars = {
 };
 export const saveLogKey = (goalId: string) => ['putLog', goalId] as const;
 export const isSaveFor = (localDate: string, vars: unknown) => (vars as SaveVars | undefined)?.localDate === localDate;
-/** 保存結果の通知（「保存前の表示との差」）を出しておく時間。 */
+/** サーバーが確定した保存の実増減を通知しておく時間。 */
 const FEEDBACK_VISIBLE_MS = 6000;
 let feedbackSequence = 0;
 
