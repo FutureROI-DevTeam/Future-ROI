@@ -130,6 +130,17 @@ test('応答喪失は再書込みより照合。0件・多件・別headを成功
   assert.equal(s.tasks[id].pr, 123);
 });
 
+test('取消中に確定したPR照合をresumeで未確定へ巻き戻さない', () => {
+  const { s, id } = setup(); pass(s, id);
+  const intent = { repository: h.repository, base: 'main', branch: `harness/${id}`, head: sha, operation: 'draft-pr' };
+  h.beginWrite(s, id, intent); h.requestCancel(s, id);
+  assert.throws(() => h.resumeCancelled(s, id), /unconfirmed/);
+  h.reconcileWrite(s, id, { complete: true, matches: [{ ...intent, number: 123, draft: true }] });
+  h.resumeCancelled(s, id);
+  assert.equal(s.tasks[id].state, 'draft-created');
+  assert.equal(s.tasks[id].pr, 123);
+});
+
 test('CIはhead/checkout/producer/run/attemptを照合。未実行・skip・旧成功は拒否', () => {
   const expected = [{ workflow: 'application.yml', job: 'application', producer: 'github-actions', checkout: 'b'.repeat(40), run: 11, attempt: 2 }];
   const good = { ...expected[0], repository: h.repository, head: sha, conclusion: 'success', status: 'completed', unrun: 0 };

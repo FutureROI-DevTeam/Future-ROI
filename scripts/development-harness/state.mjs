@@ -134,7 +134,9 @@ export function resumeCancelled(s, id) {
   insist(t?.cancelRequested && !t.active && !t.writeIntent, 'stop-or-write-unconfirmed');
   t.cancelRequested = false;
   // Cancellation is not a mandatory change request. Preserve frozen/accepted heads.
-  t.state = t.cancelState === 'implementing' ? 'repair-authorized' : t.cancelState;
+  // Reconciliation may have advanced a pending write while cancellation was requested.
+  // Resume must not roll that observed state back to the older cancellation snapshot.
+  if (t.cancelState === 'implementing' && t.state === 'awaiting-decision') { t.state = 'repair-authorized'; }
   t.cancelState = null;
 }
 

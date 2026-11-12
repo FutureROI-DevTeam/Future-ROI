@@ -87,6 +87,8 @@ export function runOne(directory, batchId, proposal) {
   const base = git(['rev-parse', 'HEAD']);
   // Read committed baseline code only; never mount checkout/.git/HOME/socket into the worker.
   const baseline = git(['show', `${base}:${candidatePath}`]) + '\n';
+  const checkSources = Object.fromEntries(['ci-report.mjs', 'ci-report.test.mjs'].map(file =>
+    [file, command('git', ['show', `${base}:.github/scripts/${file}`])]));
   // Known prerequisites fail before reservation. Uncertain create results still occupy a slot.
   command('docker', ['info', '--format', '{{.ServerVersion}}']);
   // Docker may store a tag pull only as repository@digest, without the tag@digest alias.
@@ -109,7 +111,7 @@ export function runOne(directory, batchId, proposal) {
   writeFileSync(join(policy, 'result-canary'), 'host-owned');
   // Reuse the committed existing checks; candidate cannot replace their code or result record.
   for (const file of ['ci-report.mjs', 'ci-report.test.mjs']) {
-    writeFileSync(join(policy, file), command('git', ['show', `${base}:.github/scripts/${file}`]));
+    writeFileSync(join(policy, file), checkSources[file]);
   }
   const started = attempt.startedAt;
   const deadline = started + attempt.ms;
