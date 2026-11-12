@@ -46,7 +46,7 @@ node --test experiments/question-prior-contract/completion-oracle.test.mjs
 
 draw hashは200drawのbit一致を求める凍結条件で、確認済み環境は上記のWindows x64／Node22.15.1。[BEレビュー5424570351](https://github.com/jogi-hack-2026-team/jogi-hack-2026/pull/118#pullrequestreview-5424570351)では、Apple M5／macOS arm64のNode24.21.0と25.8.2でhash不一致を報告している。レビュアーが調査用にhash確認を外した比較では、9件すべてのhashが異なる一方、9件すべてのP50／P80は一致した。これは整数日数の一致とdrawのbit再現を分ける報告であり、他環境の互換性保証ではない。OS／CPU／Nodeのどれが原因かは切り分けられておらず、本資料側でmacOSの再実測もしていない。hash検査・凍結値・許容誤差は維持する。
 
-[専用CI](../../.github/workflows/question-prior-contract.yml)は凍結Evidenceに合わせWindows／Node22.15.1でPython回帰・生成不変・既存sourceのcompile・Node回帰を実行する。T-14や性能ベンチ、API／DB／UI試験は実行しない。runtimeの採択や一般環境の互換性保証ではない。
+[専用CI](../../.github/workflows/question-prior-contract.yml)はWindows／Node22.23.5でPython回帰・生成不変・既存sourceのcompile・Node回帰を実行する。上記Node22.15.1の測定は過去のEvidenceとして保持し、修正版Nodeでも凍結値・hashの検査を緩めない。T-14や性能ベンチ、API／DB／UI試験は実行しない。runtimeの採択や一般環境の互換性保証ではない。
 
 `packages/prediction/**`をCIの対象pathへ含めるのは、Engineの観測処理・sampler・DP等の変更が固定Evidenceへ与える差分を検知するため。失敗時は入力・計算・実行環境を確認し、意図した変更ならEvidenceの更新要否をレビューする。赤いcheckだけで製品の数値誤りや変更の採否を確定しない。`windows-latest`はWindows imageの版を固定していないため、全imageでのbit一致も保証しない。本追記でworkflowのpathやrequired check設定は変更しない。
 

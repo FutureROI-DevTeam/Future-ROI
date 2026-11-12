@@ -11,7 +11,7 @@ docker build --file packages/prediction/Dockerfile.verification --tag futureroi-
 docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges futureroi-prediction-verification:local
 ```
 
-build contextはリポジトリのルート。[専用ignore設定](Dockerfile.verification.dockerignore)でroot lockfileとpackage内の検証用ファイルだけを送る。[Dockerfile](Dockerfile.verification)は公式Node 22.15.1 bookworm-slimをmanifest digestで固定し、既存CIの検証版を再現する。製品runtimeの最終採択とは区別する。依存はroot `package-lock.json`からこのworkspace分だけを取得し、lifecycle scriptsを無効にしてコンテナ内だけへinstallする。hostの`.env`、Git、node_modules、distは渡さず、volumeやポートも使わない。既存のDocker context・volumeは変更しない。
+build contextはリポジトリのルート。[専用ignore設定](Dockerfile.verification.dockerignore)でroot lockfileとpackage内の検証用ファイルだけを送る。[Dockerfile](Dockerfile.verification)は公式Node 22.23.5 bookworm-slimをmanifest digestで固定し、既存CIの検証版を再現する。製品runtimeの最終採択とは区別する。依存はroot `package-lock.json`からこのworkspace分だけを取得し、lifecycle scriptsを無効にしてコンテナ内だけへinstallする。hostの`.env`、Git、node_modules、distは渡さず、volumeやポートも使わない。既存のDocker context・volumeは変更しない。
 
 [実行スクリプト](scripts/verify-docker.mjs)は版表示 → 型検査 → 全数値テスト → 11接続例 → 統合済みなら30日fixture → 実Engine T-14の順に既存コマンドを呼ぶ。成功時は末尾に`PASS:`が出てexit 0となる。型検査・テスト・例・T-14の失敗は非0で終了する。出力JSONはコンテナ内の`/tmp/prediction-verification/connection.json`と`t14.json`、30日fixtureがある場合は`demo-inputs.json`へ保存する。`--rm`の通常実行では終了後にコンテナごと消える。
 
