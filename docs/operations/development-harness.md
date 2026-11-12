@@ -48,7 +48,7 @@ node scripts/development-harness/cli.mjs resume $stateDir fixture-addition
 node scripts/development-harness/cli.mjs run $stateDir local-comparison-1 (Join-Path $stateDir 'proposals.json')
 ```
 
-`cancel`だけではworkerは止まらない。`recover`は台帳のcontainer名とlabelを照合し、Docker stop/inspectで終了を確認する。CLIが落ちても枠は残る。daemon障害、container不明、停止不明では解放しない。createの応答喪失やcontainer削除で存在を確認できない場合は、daemon復旧と実体照合を人へ引き継ぐ。ledger/lockを消して次へ進めない。lockが残った場合もwriterの終了とledger内容・active実体を確認してから復旧する。
+`cancel`だけではworkerは止まらない。`recover`は台帳のcontainer名とlabelを照合し、Docker stop/inspect後にその実体だけを削除してから枠を解放する。元controllerの遅いstartによる再起動を防ぐためで、volumeや他containerは削除しない。CLIが落ちても枠は残る。daemon障害、container不明、停止・削除の結果不明では解放しない。createの応答喪失やcontainer削除で存在を確認できない場合は、daemon復旧と実体照合を人へ引き継ぐ。ledger/lockを消して次へ進めない。lockが残った場合もwriterの終了とledger内容・active実体を確認してから復旧する。
 
 失敗修復は `repair STATE_DIR ID evidence.json` を使用する。evidenceは `kind`（`mandatory-local-failure` / `required-review-change` / `required-ci-failure`）、現在の `head`（初回失敗はnull）、元の必須条件と再現に紐付く `reference` を持つ。Optional、head違い、未確定書込み中は拒否。修正proposalを用意した後、同じrunで再検証する。
 

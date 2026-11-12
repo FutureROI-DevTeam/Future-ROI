@@ -48,7 +48,11 @@ export function stopAndConfirm(name, deadline = Date.now() + 15000) {
 export function recover(directory, id) {
   const active = transaction(directory, s => s.tasks[id]?.active);
   if (!active) { throw new Error('no-active-worker'); }
-  stopAndConfirm(active.container);
+  const deadline = Date.now() + 15000;
+  stopAndConfirm(active.container, deadline);
+  // A CREATED container is restartable by an in-flight controller. Remove that exact UUID
+  // before releasing its reservation, so a delayed docker start cannot resurrect the worker.
+  command('docker', ['rm', active.container], { timeout: timeRemaining(deadline) });
   transaction(directory, s => finish(s, id, { container: active.container, stopped: true, passed: false,
     diagnostic: 'recovered-interruption', head: null }));
 }
@@ -179,5 +183,6 @@ export function runOne(directory, batchId, proposal) {
   if (stopped) { transaction(directory, s => {
     if (s.tasks[id].active?.container === name) { finish(s, id, receipt); }
   }); }
-  return { id, state: stopped ? transaction(directory, s => s.tasks[id].state) : 'stop-unconfirmed', folder };
+  const state = transaction(directory, s => s.tasks[id]);
+  return { id, state: state.active ? 'stop-unconfirmed' : state.state, folder };
 }

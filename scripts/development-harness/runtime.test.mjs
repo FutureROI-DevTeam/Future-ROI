@@ -116,3 +116,19 @@ test('AR-02 実Docker: 遅い候補を共通期限で止め、新しい合格成
   if (result.state === 'stop-unconfirmed') { recover(directory, c.tasks[0].id); }
   assert.ok(transaction(directory, s => s.tasks[c.tasks[0].id].reservedMs) >= 20000);
 });
+
+test('FR-01 実Docker: createdの復旧後に元controllerが遅れてstartしても実行できない', () => {
+  const { directory, c, id } = setup();
+  const name = 'roi-harness-created-' + Date.now();
+  command('docker', ['create', '--pull', 'never', '--name', name, '--label', `future-roi-harness=${name}`,
+    '--network', 'none', '--read-only', '--cap-drop', 'ALL', image, 'node', '-e', 'setTimeout(()=>{},30000)']);
+  transaction(directory, s => {
+    s.tasks[id].active = { container: name, startedAt: Date.now(), attempt: 1 };
+    s.tasks[id].attempts = 1; s.tasks[id].reservedMs = 60000; s.batches[c.batchId].reservedMs = 60000;
+    s.tasks[id].state = 'implementing';
+  });
+  recover(directory, id);
+  assert.equal(transaction(directory, s => s.tasks[id].active), null);
+  assert.throws(() => command('docker', ['start', name]), /Command failed/);
+  assert.equal(transaction(directory, s => s.tasks[id].attempts), 1);
+});
