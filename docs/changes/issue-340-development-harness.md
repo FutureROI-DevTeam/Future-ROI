@@ -95,4 +95,15 @@ review-gateの対象はIssue #340、契約・権限・状態・固定検査・�
 
 事前診断のglobal AGENTS読込みとauth hardlink原本更新は固定版ソースで確認し、隔離ホーム＋ACL確認後のaccess/idのみ複写へ変更した。hardlink案は利用枠read-only確認後に破棄・unlink済み。最終adapterは原本を変更しない。CLIの構成は[公式設定リファレンス](https://learn.chatgpt.com/docs/config-file/config-reference)と固定版ソース、実native probeを照合した。最新版のToolPolicy APIを固定0.151.0で使えるとは仮定しない。
 
-実認証によるモデル生成の結果は、確定した実行SHAと候補SHA・台帳に基づき追記する。ここまでのmock成功を実モデル成功へ昇格させない。
+## 実Codex接続結果
+
+実装SHA `379a284abb0d612ac07007d1b23ddf0dbffd2957` で、既存ChatGPT認証を使う `run-codex` を1件実行した。基準mainは再読して `7beba614697ecc3098cde122e2f0305842962812` のまま。モデルは固定 `gpt-6.1-sol`、CLI 0.151.0。Codexがfixtureの `a - b` を `a + b` へ修正し、候補commit **`2999517d824c436ffed7896cfde9355fe6e33b8a`** とpatch/Draft本文を生成した。実backlogの製品Issue完了ではない。
+
+- 実行台帳: 専用worktreeの `.local/harness-340-codex-live/ledger.json`
+- 実証成果物: `.local/harness-340-codex-live/fixture-issue-340/1/`
+- `artifacts-ready`、attempt 1、修復0、時間予約300000ms、実経過15624ms、active null。入力600/output72 tokens。総費用・人の時間はnull。
+- 隔離Docker書込み拒否6件、不要認証なし、外側の整数出力照合、固定baselineのci-report回帰6/6成功。PR後CIはnot-run。
+- 実行直前の購読利用27%、追加creditsなし。API key/refresh tokenをworkerへ渡さず、終了後に専用authホーム不存在を確認した。再送の `run-codex` は新しいモデル起動・attempt・head変更なしで正常終了した。
+- `model-result.json` 初版の `requests:2` は**fake tool-boundary probe**のHTTP件数であり、実推論要求数ではない。混同を防ぐため後続コードでは `toolBoundaryProbe` に分離し、`inferenceRequests:null` と明示する。元の実行証拠を改変しない。
+
+実認証モデル→生成source→隔離検証→候補commit/Draft成果物の経路は実測した。実モデルの初回は成功のため、修復・偽成功・中断の異常系は無害なfixture/偽認証/実process試験の証拠として分ける。publisher、PR→CI取得、任意Issueの自律選定/実装、実利用者受入、費用/人手削減は未検証のまま。Issue #340はOpen、main merge・配備・追加権限/Secrets・定期起動は行っていない。

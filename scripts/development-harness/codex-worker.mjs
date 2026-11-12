@@ -132,7 +132,8 @@ export async function generateProposal({ directory, id, folder, deadline, base, 
     modelStopped = result.stopped;
     update(a => { a.model.stopped = result.stopped; a.phase = 'model-stopped'; });
     const decoded = decodeResult(result);
-    const receipt = { ...gate, quota, usage: decoded.usage, stopped: true, totalCostCents: null };
+    const receipt = { toolBoundaryProbe: gate, inferenceRequests: null,
+      quota, usage: decoded.usage, stopped: true, totalCostCents: null };
     writeFileSync(join(folder, 'model-result.json'), JSON.stringify(receipt, null, 2));
     return { ...decoded, modelReceipt: receipt };
   } finally {
