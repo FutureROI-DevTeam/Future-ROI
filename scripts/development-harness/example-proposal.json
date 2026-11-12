@@ -1,0 +1,5 @@
+{
+  "files": {
+    "experiments/development-harness-fixture/answer.mjs": "const values = JSON.parse(process.argv[2]);\nconsole.log(JSON.stringify(values.map(([a, b]) => a + b)));\n"
+  }
+}
