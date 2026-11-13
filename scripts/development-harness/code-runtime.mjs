@@ -62,7 +62,7 @@ export async function runCode(directory, batchId) {
   if (!isCode(contract)) throw new Error('worker-mode-mismatch');
   const task = transaction(directory,s=>s.tasks[id]);
   const {issue,main,comments} = accounted(directory,id,30000,()=>{
-    observeWork(spec,task);
+    observeWork(spec,task,api,contract.baseSha);
     return {issue:api(`repos/${contract.repository}/issues/${spec.issue}`),main:api(`repos/${contract.repository}/branches/main`),comments:pages(`issues/${spec.issue}/comments`).map(c=>({body:c.body}))};
   });
   if (issue.state!=='open'||issue.pull_request) throw new Error('issue-not-open');

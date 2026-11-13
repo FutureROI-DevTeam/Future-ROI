@@ -179,3 +179,12 @@ mainは現在active rulesetsで保護され、既存GitHub認証にpush権限が
 - 受入: 1234/負値/大きい整数、1,000未満の境界、null/0、既存の保存・試算回帰、実Chromiumの2部品表示、型/build。独立レビュー後に同headのDraft→実CIを確認し、IssueはCloseしない。
 - 失敗仮説: 3桁丸めを直して微小値を0にする、負値の符号を壊す、保存ロジックやARIAを変更する、候補が検査を弱める/偽TAPを出す、別branch重複、古いレビュー/CIを流用する。固定mainの検査・依存をread-only imageへ置き、候補はexact2fileのread-only mount、policy/results書込み拒否を実測する。生成・build・publisherは別process/権限とし、候補に認証を渡さない。
 - 予算: 新しい作業ID issue-253、同一台帳、worker1/レビュー待ち1、初回1+修復3、attempt300秒/task・batch1800秒/lifetime24時間。追加課金0、総費用/人の時間は未計測null。実装・診断は本セッションの有限作業で、指摘の好みを理由に反復しない。
+
+実装前の独立確認で、未実装・採択済み・重複なしのOpen Issueが見つからなかった。#253指摘2の限定案と#346のレビュー枠を質問し、依頼者の明示回答後だけ進めた。旧mainの実Chromium検査は `+1,230pt` / 期待 `+1,234pt` で失敗、同じ隔離imageの既存保存/試算・ブラウザ・型/buildは成功。readonly直接書込み5対象、rename、symlink経由の7拒否、秘密・host Git/socket不在を実測した。image構築の実行step合計は約264秒（取得265MBを含む）、preflightは75,428ms。準備時間をworker成果の高速化や人の時間へ読み替えない。
+
+| ID / 重大度 / 対象 | 成立条件・悪影響・既存防御 | 根拠と最小修正 | 状態 |
+| --- | --- | --- | --- |
+| CR-05 / Blocking / 1d5b125 code-browser-check.mjs | 許可TSXがmain worldのObject.fromEntriesを上書きすると、実描画が誤ったままDOMの観測値だけ偽装できる。readonlyはNode/ファイルを守るが同worldのintrinsicsは守らない | 独立reviewerが元の2TSX＋観測shimを隔離Dockerへ入れ、誤表示のままpass1を再現。DOM読取りをCDP isolated world/contextIdへ移し、候補のglobal/prototypeと分離 | 修正済み・再確認待ち |
+| CR-06 / 必須経路の阻害 / 1d5b125 github.mjs | #253を参照したmerged #339のSaveFeedback変更を未完了競合と誤判定。生成前に停止する安全側の失敗 | 実照合でmodel0/attempt0の停止を確認。Issue固有branch/markerを持たず、merge commitが固定baseのancestorと確認できる履歴だけを重複判定から除く。未merge・同Issue・判定不能は停止を維持。17件の隣接回帰成功 | 修正済み・実接続再確認待ち |
+
+初回Foundationは追記末尾の空行で失敗し、空行修正後に125 text/2904 links成功。受入条件の弱化や検査削除では解消していない。

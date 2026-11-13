@@ -61,14 +61,21 @@ export function classifyWork(spec, task, refs, prs, localRefs = []) {
   }
   return { pr: relevant[0] ?? null, remote: refs.find(r => r.branch === spec.branch) ?? null };
 }
-export function observeWork(spec, task, read = api) {
+export function historicalBaselinePR(pr, spec, base, ancestor = (sha, baseline) => {
+  try { command('git', ['merge-base', '--is-ancestor', sha, baseline]); return true; } catch { return false; }
+}) {
+  const ownBranch = new RegExp(`(?:^|[/_-])${spec.issue}(?:$|[/_-])`).test(pr.head?.ref ?? '');
+  return !!base && pr.state === 'closed' && !!pr.merged_at && /^[a-f0-9]{40}$/.test(pr.merge_commit_sha ?? '') &&
+    !ownBranch && !(pr.body ?? '').includes(`<!-- future-roi-harness:issue-${spec.issue} -->`) && ancestor(pr.merge_commit_sha, base);
+}
+export function observeWork(spec, task, read = api, base) {
   const branches = pages('branches', null, read).map(b => ({ branch: b.name, sha: b.commit.sha }));
   const prs = pages('pulls?state=all', null, read);
   // A mention in the implementation PR is not a second execution of the demonstration.
   // Inspect the referenced PR's actual paths; do not ignore an overlap under another branch.
   const issueRef = new RegExp(`(?:#|issues/)${spec.issue}(?![0-9])`);
   const issueDocument = new RegExp(`^docs/changes/issue-${spec.issue}-[a-z0-9-]+\\.md$`);
-  for (const pr of prs.filter(p => p.state === 'open' || issueRef.test(p.body ?? ''))) {
+  for (const pr of prs.filter(p => (p.state === 'open' || issueRef.test(p.body ?? '')) && !historicalBaselinePR(p, spec, base))) {
     pr.scopeOverlap = pages(`pulls/${pr.number}/files`, null, read).some(f => [f.filename, f.previous_filename].filter(Boolean).some(path =>
       spec.allowedFiles.includes(path) || issueDocument.test(path)));
   }
@@ -101,7 +108,7 @@ function publish(directory, id, io = { read: api, observe: observeWork, push: (h
   });
   let { task, contract, spec } = snapshot();
   (io.verify ?? verifyCandidate)(contract, spec, task.head);
-  let observed = io.observe(spec, task, io.read);
+  let observed = io.observe(spec, task, io.read, contract.baseSha);
   // A lost response only permits observation. Absence is not permission to retry a write.
   if (task.writeIntent) {
     const i = task.writeIntent;

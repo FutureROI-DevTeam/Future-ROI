@@ -32,25 +32,30 @@ test('#253: real Chromium checks integer digits, old small values, signs and ann
   session = launchBrowser({ browser: process.env.TEST_BROWSER, profile: '/tmp/points-browser', signal: t.signal,
     args: ['--headless', '--disable-gpu', '--no-first-run', '--disable-background-networking', '--remote-debugging-port=0', '--user-data-dir=/tmp/points-browser', 'about:blank'] });
   const cdp = await session.ready();
-  const evaluate = async expression => { const r = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); assert.ok(!r.exceptionDetails, 'browser exception'); return r.result.value; };
+  const evaluate = async (expression, contextId) => { const r = await cdp.send('Runtime.evaluate', { expression, ...(contextId ? { contextId } : {}), returnByValue: true, awaitPromise: true }); assert.ok(!r.exceptionDetails, 'browser exception'); return r.result.value; };
   await cdp.send('Page.enable'); await cdp.send('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/` });
   for (let i = 0; i < 200 && !await evaluate('typeof window.renderCase==="function"'); i++) await new Promise(r => setTimeout(r, 25));
   assert.equal(await evaluate('typeof window.renderCase'), 'function');
+  // Candidate globals/prototypes must not forge the observer's DOM serialization.
+  const { frameTree } = await cdp.send('Page.getFrameTree');
+  const { executionContextId } = await cdp.send('Page.createIsolatedWorld', { frameId: frameTree.frame.id, worldName: 'trusted-points-observer', grantUniveralAccess: false });
+  assert.ok(Number.isInteger(executionContextId) && executionContextId > 0);
+  const observe = expression => evaluate(expression, executionContextId);
   // Literal expectations are independent of the candidate's formatting algorithm.
   const cases = [[1234,'1,234'],[12345,'12,345'],[214748364700,'214,748,364,700'],[1000,'1,000'],[999,'999'],[999.9,'1,000'],[0.667,'0.667'],[0.25,'0.25'],[0.000001234,'0.00000123'],[0,'0']];
   for (const [magnitude, expected] of cases) for (const direction of [1,-1]) {
     const points = magnitude * direction, amount = magnitude === 0 ? 0 : direction * 1234, sign = amount < 0 ? '−' : '+';
     await evaluate(`window.renderCase(${points},${amount})`);
-    const dom = await evaluate(`Object.fromEntries(['delta','amount','saved','preview','compact'].map(id=>[id,document.getElementById(id).textContent]))`);
+    const dom = await observe(`Object.fromEntries(['delta','amount','saved','preview','compact'].map(id=>[id,document.getElementById(id).textContent]))`);
     assert.equal(dom.delta, sign + expected + 'pt');
     assert.equal(dom.amount, sign + Math.abs(amount).toLocaleString('ja-JP') + '回');
     assert.ok(dom.saved.includes(sign + expected + 'パーセントポイント'));
     for (const id of ['preview','compact']) assert.ok(dom[id].includes(amount === 0 ? '量・進捗は変わりません' : sign + expected + 'パーセントポイント'));
-    assert.deepEqual(await evaluate(`({saved:document.querySelector('#saved [role=status]')?.getAttribute('aria-live'),preview:document.querySelector('#preview [role=status]')?.getAttribute('aria-atomic'),compact:document.querySelector('#compact [role=status]')===null,hidden:document.querySelector('#delta span')?.getAttribute('aria-hidden')})`), { saved:'polite',preview:'true',compact:true,hidden:'true' });
+    assert.deepEqual(await observe(`({saved:document.querySelector('#saved [role=status]')?.getAttribute('aria-live'),preview:document.querySelector('#preview [role=status]')?.getAttribute('aria-atomic'),compact:document.querySelector('#compact [role=status]')===null,hidden:document.querySelector('#delta span')?.getAttribute('aria-hidden')})`), { saved:'polite',preview:'true',compact:true,hidden:'true' });
   }
   await evaluate('window.renderCase(null)');
-  assert.deepEqual(await evaluate(`['delta','amount','saved','preview','compact'].map(id=>document.getElementById(id).textContent)`), ['','','','','']);
-  assert.equal(await evaluate('document.querySelectorAll("[role=status]").length'), 1);
+  assert.deepEqual(await observe(`['delta','amount','saved','preview','compact'].map(id=>document.getElementById(id).textContent)`), ['','','','','']);
+  assert.equal(await observe('document.querySelectorAll("[role=status]").length'), 1);
   await mkdir('/tmp/points-evidence', { recursive: true });
   await evaluate('window.renderCase(1234)');
   for (const width of [390,1440]) {

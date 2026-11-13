@@ -5,8 +5,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { codeFiles, codeProfile, validateCode, validateCodeDiff, recordCodeReview } from './code-profile.mjs';
 import { validateContract, emptyLedger, enroll, reserve, finish, nextTask, authorizeRepair, initialize, transaction } from './state.mjs';
-import { publishDraft } from './github.mjs';
+import { publishDraft, historicalBaselinePR } from './github.mjs';
 const head='a'.repeat(40);
+test('merged baseline history is not unfinished work, but same-Issue identity and unknown ancestry still block',()=>{
+  const spec={issue:253},pr={state:'closed',merged_at:'2026-11-12',merge_commit_sha:head,head:{ref:'fix/244-actual-save-delta'},body:'Refs #253'};
+  assert.equal(historicalBaselinePR(pr,spec,head,()=>true),true);
+  for(const changed of [{merged_at:null},{state:'open'},{head:{ref:'fix/253-old'}},{body:'<!-- future-roi-harness:issue-253 -->'},{merge_commit_sha:'unknown'}])assert.equal(historicalBaselinePR({...pr,...changed},spec,head,()=>true),false);
+  assert.equal(historicalBaselinePR(pr,spec,head,()=>false),false);
+  assert.equal(historicalBaselinePR(pr,spec,undefined,()=>true),false);
+});
 export function contract() {
   const c=JSON.parse(readFileSync(new URL('./issue-331-contract.json',import.meta.url)));
   Object.assign(c,{mode:'codex-issue-code',batchId:'issue-code-253-v1'});

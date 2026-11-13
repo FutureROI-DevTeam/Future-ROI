@@ -29,7 +29,7 @@ export async function runDocument(directory, batchId) {
   if (contract.mode !== 'codex-issue-docs') { throw new Error('worker-mode-mismatch'); }
   const task = transaction(directory, s => s.tasks[id]);
   const { issue, main, comments } = accounted(directory, id, 30000, () => {
-    observeWork(spec, task); // Existing branches/PRs are reconciled before model spend.
+    observeWork(spec, task, api, contract.baseSha); // Existing branches/PRs are reconciled before model spend.
     return { issue: api(`repos/${contract.repository}/issues/${spec.issue}`), main: api(`repos/${contract.repository}/branches/main`),
       comments: pages(`issues/${spec.issue}/comments`).map(c => ({ author: c.user.login, createdAt: c.created_at, body: c.body })) };
   });
