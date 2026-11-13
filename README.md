@@ -103,6 +103,8 @@ pwsh -NoProfile -File scripts/check-document-diagrams.ps1
 
 ## 関連ドキュメント
 
+[目的別の文書入口](docs/README.md)から、仕様・実装・確認方法と大会後の保守手順へ進めます。
+
 - [Architecture](docs/architecture.md)：構成図、責務、技術選定、API・DBの設計
 - [Prediction Engine](packages/prediction/README.md)：計算方法、独立オラクル、テスト
 - [実験履歴](docs/prediction/experiment-history.md)：比較したモデル、速度、失敗、採否と根拠
@@ -112,7 +114,7 @@ pwsh -NoProfile -File scripts/check-document-diagrams.ps1
 
 ### 現在の状態
 
-[開発基盤の状態と当時の記録](docs/operations/development-foundation-status.md#現在の状態)
+[実装・確認方法の現在地](docs/change-map.md#現在地の読み方)を参照してください。過去の結果は[2026-10-11時点の状態記録](docs/operations/development-foundation-status.md#現在の状態)として保存しています。文書更新を公開環境での受入完了とは扱いません。
 
 ### 廃止した音楽案の履歴
 
