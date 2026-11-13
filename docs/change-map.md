@@ -2,6 +2,8 @@
 
 ## 有限開発ハーネスの比較（#340）
 
+#253の限定コード修正は[契約](../scripts/development-harness/issue-253-contract.json) → [2ファイルの許可範囲](../scripts/development-harness/code-profile.mjs) → [隔離コード検査](../scripts/development-harness/code-runtime.mjs) → [実Chromium期待値](../scripts/development-harness/code-browser-check.mjs)へ追跡する。対象は[SaveFeedback/SaveDelta](../apps/web/src/features/logs/SaveFeedback.tsx)と[未保存試算](../apps/web/src/features/today/DraftProgressPreview.tsx)。ordinary workerは検査を編集できず、検査追加はハーネスPR、候補の製品2ファイルは別PRである。
+
 実Issueの限定profileは[文書生成・隔離検査](../scripts/development-harness/docs-runtime.mjs)、[branch/PR・publisher・CI照合](../scripts/development-harness/github.mjs)、[#331契約](../scripts/development-harness/issue-331-contract.json)、[負の回帰](../scripts/development-harness/docs.test.mjs)へ追跡する。文書の比較結果を製品採択・Issue完了にしない。
 
 実Codex接続は[生成・認証・復旧](../scripts/development-harness/codex-worker.mjs)と[固定CLI protocol](../scripts/development-harness/codex-client.mjs)、[契約例](../scripts/development-harness/codex-contract.json)へ追跡する。[portable回帰](../scripts/development-harness/codex.test.mjs)と[Windows実CLIの偽認証回帰](../scripts/development-harness/codex-runtime.test.mjs)を実モデル接続結果と区別する。

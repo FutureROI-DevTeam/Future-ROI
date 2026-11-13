@@ -720,6 +720,8 @@ resetは同ユーザーの初回にも効くtransaction advisory lock→認証us
 
 契約・不変条件・起動/停止/復旧・再検討条件は[運用手順](operations/development-harness.md)、比較根拠・試験と独立レビューは[検証記録](changes/issue-340-development-harness.md)に残す。
 
+2026-11-13の追加依頼で、#253指摘2の整数部表示修正を限定採択し、対象2 TSXだけを生成するcode profileへ拡張する。既存source生成・台帳・publisherを再利用し、固定main/lockの検査imageと別ChromiumでのDOM検査を採用する。任意コードprofile、候補による検査変更、無人レビューは採用しない。code profileのDraft発行には対象headの独立レビュー記録を要求し、人間のApproveと区別する。限定修正の採択は製品仕様全体の再検討や他Issueの実装許可ではない。
+
 ### D-31 同一モデルの完了CDF統合候補（#203）
 
 2026-10-10 / **DECIDED（Kaito-Iwaseの明示判断）** / [PR #204](https://github.com/jogi-hack-2026-team/jogi-hack-2026/pull/204)の計算方式を採用する。見出しは候補実装時の参照先として保持する。判断の出所はKaito-Iwaseであり、チーム全員の合意・Human APPROVED review・mainへのMerge・公開配置・実ユーザー検証を済みとする記録ではない。

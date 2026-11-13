@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { repository, transaction } from './state.mjs';
 import { command } from './runtime.mjs';
+import { isCode, validateCodeDiff } from './code-profile.mjs';
 const limits = new AsyncLocalStorage();
 export function remaining(maximum = 20000) {
   const left = (limits.getStore()?.deadline ?? Date.now() + maximum) - Date.now();
@@ -77,13 +78,16 @@ export function observeWork(spec, task, read = api) {
 }
 export function verifyCandidate(contract, spec, head) {
   const diff = command('git', ['diff', '--raw', '--no-abbrev', contract.baseSha, head]).trim().split(/\r?\n/);
-  if (diff.length !== 1 || !diff[0].startsWith(':000000 100644 ') || !diff[0].endsWith(` A\t${spec.allowedFiles[0]}`)) { throw new Error('candidate-diff-forbidden'); }
+  if (isCode(contract)) {
+    validateCodeDiff(diff);
+  } else if (diff.length !== 1 || !diff[0].startsWith(':000000 100644 ') || !diff[0].endsWith(` A\t${spec.allowedFiles[0]}`)) { throw new Error('candidate-diff-forbidden'); }
   command('git', ['merge-base', '--is-ancestor', contract.baseSha, head]);
 }
 export function publishDraft(directory, id, io) {
   const t = transaction(directory, s => {
     const task = s.tasks[id], c = s.batches[task?.batchId]?.contract;
-    if (!task || c?.mode !== 'codex-issue-docs' || c.publish !== true) { throw new Error('publish-not-authorized'); }
+    if (!task || !(c?.mode === 'codex-issue-docs' || c && isCode(c)) || c.publish !== true) { throw new Error('publish-not-authorized'); }
+    if (isCode(c) && (task.codeReview?.head !== task.head || task.codeReview?.blocking !== 0)) { throw new Error('code-review-evidence-required'); }
     return { task, budget: c.publishMs };
   });
   return accounted(directory, id, t.budget, () => publish(directory, id, io), !!t.task.writeIntent);
@@ -91,7 +95,8 @@ export function publishDraft(directory, id, io) {
 function publish(directory, id, io = { read: api, observe: observeWork, push: (head, branch) => command('git', ['push', `https://github.com/${repository}.git`, `${head}:refs/heads/${branch}`], { timeout: remaining(60000) }) }) {
   const snapshot = () => transaction(directory, s => {
     const t = s.tasks[id], c = s.batches[t?.batchId]?.contract;
-    if (!t || c.mode !== 'codex-issue-docs' || !c.publish || t.active) { throw new Error('publish-not-authorized'); }
+    if (!t || !(c.mode === 'codex-issue-docs' || isCode(c)) || !c.publish || t.active) { throw new Error('publish-not-authorized'); }
+    if (isCode(c) && (t.codeReview?.head !== t.head || t.codeReview?.blocking !== 0)) { throw new Error('code-review-evidence-required'); }
     return { task: t, contract: c, spec: c.tasks.find(x => x.id === id) };
   });
   let { task, contract, spec } = snapshot();
@@ -142,7 +147,7 @@ function publish(directory, id, io = { read: api, observe: observeWork, push: (h
   if (observed.remote.sha !== task.head || task.pushedHead !== task.head) { throw new Error('unowned-existing-branch'); }
   intent('draft');
   io.read(endpoint('pulls'), { head: spec.branch, base: 'main', draft: true,
-    title: `docs: #${spec.issue} の比較資料を追加する`,
+    title: isCode(contract) ? `fix: #${spec.issue} の増減表示で整数部の桁落ちを防ぐ` : `docs: #${spec.issue} の比較資料を追加する`,
     body: `<!-- future-roi-harness:issue-${spec.issue} -->\n## 変更\n\n${spec.purpose}\n\nRefs #${spec.issue}\n\nハーネス #340 による実Issue成果物。採択・依存更新・Issue完了は含みません。\n\n## 検証\n\n固定main ${contract.baseSha} の検査を無認証のread-only環境で実行。候補head ${task.head}。PR後CIは確認待ち。総費用・人の時間は未計測。\n` });
   return publish(directory, id, io);
 }
@@ -199,7 +204,7 @@ export function saveCIObservation(s, id, observed, evidence) {
   const current = s.tasks[id];
   if (current.head !== observed.head || current.ciObservation !== observed.ciObservation || current.state !== 'ci-wait' || current.active || current.writeIntent || current.cancelRequested) { throw new Error('ci-head-or-state-race'); }
   current.ci = evidence; current.state = evidence.passed ? 'review-ready' : 'ci-wait';
-  current.resumeReason = evidence.passed ? 'human-document-review-and-adoption-decision; head-frozen' : 'observe-required-ci-for-same-head';
+  current.resumeReason = evidence.passed ? 'human-artifact-review; head-frozen; no-issue-close-or-adoption' : 'observe-required-ci-for-same-head';
 }
 function observeChecks(directory, id, t) {
   const pr = api(endpoint(`pulls/${t.pr}`));

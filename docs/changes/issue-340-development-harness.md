@@ -169,3 +169,13 @@ mainは現在active rulesetsで保護され、既存GitHub認証にpush権限が
 最後に同じDraftへの必須修正FF経路の無害IO回帰を追加し、push1・POST0・旧CI破棄・draft-createdへの復帰を確認した。戻り値が古いartifacts-readyになる表示の不整合を修正した。docs/publisher回帰は10/10成功（既存9件と重複加算しない）。実PRへ不要な修正は加えていない。実装PR #344 の最終headのCIはPR側の実runとIssue開発情報で追跡する。
 
 その後SR-01の必須修正を加え、docs/publisher12/12、隣接状態/Codex/ci-reportを含む34/34、skip0で再確認した。a4bad24の実装PR CI4件も成功済み（Application43364555164/Foundation43364555125、attempt1、checkout97d017016affa7ab0f2b2bac7d96802bfd6e326e）だが、後続修正のCIへ流用しない。新しい最終headをpushし、全必須CIと実checkoutを別に確認する。
+
+## 2026-11-13 コード修正profileの追加計画
+
+ユーザーが #253 指摘2の限定修正を採択した。保存後通知・未保存試算の絶対値1,000以上の整数部を落とさず表示し、1,000未満の3有効桁、計算・保存・owner・他4指摘は維持する。#346の成果物レビュー確認も明示され、同じ台帳のhead・累積予算を保持してレビュー枠だけ解放済み。
+
+- 変更対象: 対象2部品だけを生成できる固定profile、既存Codex/状態/publisherへの接続、immutableな回帰入口、運用記録。候補workerにテスト・CI・policy・依存・ハーネスの変更権限を与えない。
+- 採用理由: 文書専用入口を任意コード実行へ一般化せず、既存のJSON source生成とDocker/ci-report/branch照合を再利用する。AWの新認証・常駐controller・新DBは不要。
+- 受入: 1234/負値/大きい整数、1,000未満の境界、null/0、既存の保存・試算回帰、実Chromiumの2部品表示、型/build。独立レビュー後に同headのDraft→実CIを確認し、IssueはCloseしない。
+- 失敗仮説: 3桁丸めを直して微小値を0にする、負値の符号を壊す、保存ロジックやARIAを変更する、候補が検査を弱める/偽TAPを出す、別branch重複、古いレビュー/CIを流用する。固定mainの検査・依存をread-only imageへ置き、候補はexact2fileのread-only mount、policy/results書込み拒否を実測する。生成・build・publisherは別process/権限とし、候補に認証を渡さない。
+- 予算: 新しい作業ID issue-253、同一台帳、worker1/レビュー待ち1、初回1+修復3、attempt300秒/task・batch1800秒/lifetime24時間。追加課金0、総費用/人の時間は未計測null。実装・診断は本セッションの有限作業で、指摘の好みを理由に反復しない。

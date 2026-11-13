@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, openSync, closeSync, readFileSync, writeFileSync, renameSync, unlinkSync, fsyncSync } from 'node:fs';
 import { join } from 'node:path';
+import { isCode, codeFiles, codeProfile } from './code-profile.mjs';
 
 export const repository = 'FutureROI-DevTeam/Future-ROI';
 export const digest = value => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
@@ -12,8 +13,8 @@ export const reviewStates = ['artifacts-ready', 'draft-created', 'ci-wait', 'rev
 // not instructions from an issue, candidate, log, or arbitrary command in JSON.
 export function validateContract(c) {
   insist(c?.version === 1 && c.repository === repository && /^[a-z0-9-]{1,48}$/.test(c.batchId), 'invalid-contract');
-  const docs = c.mode === 'codex-issue-docs';
-  insist(['local-fixture', 'codex-fixture', 'codex-issue-docs'].includes(c.mode) && (docs ? c.publish === true : c.publish === false), 'live-execution-disabled');
+  const docs = c.mode === 'codex-issue-docs', code = isCode(c), live = docs || code;
+  insist(['local-fixture', 'codex-fixture', 'codex-issue-docs', 'codex-issue-code'].includes(c.mode) && (live ? c.publish === true : c.publish === false), 'live-execution-disabled');
   insist(c.workers === 1 && c.reviewLimit === 1 && c.maxRepairs === 3, 'unsupported-capacity');
   insist(positive(c.attemptMs) && c.attemptMs > 15000 && c.attemptMs <= (c.mode.startsWith('codex-') ? 300000 : 60000) && positive(c.batchMs) && positive(c.taskMs), 'invalid-time-budget');
   insist(positive(c.lifetimeMs) && c.lifetimeMs <= 86400000, 'invalid-lifetime');
@@ -21,7 +22,7 @@ export function validateContract(c) {
   if (c.mode === 'codex-fixture') {
     insist(c.auth === 'existing-chatgpt-no-credits' && c.maxModelRuns === 4 && c.issue === 340, 'unsupported-model-contract');
   }
-  if (docs) {
+  if (live) {
     insist(c.auth === 'existing-chatgpt-no-credits' && c.maxModelRuns === 4, 'unsupported-model-contract');
     insist(/^[a-f0-9]{40}$/.test(c.baseSha) && /^sha256:[a-f0-9]{64}$/.test(c.validatorImage), 'pinned-baseline-required');
     insist(positive(c.publishMs) && c.publishMs <= 300000, 'invalid-publish-budget');
@@ -29,16 +30,16 @@ export function validateContract(c) {
   insist(Array.isArray(c.tasks) && c.tasks.length > 0 && c.tasks.length <= 10, 'finite-batch-required');
   const ids = new Set();
   for (const t of c.tasks) {
-    if (docs) {
+    if (live) {
       insist(positive(t.issue) && t.id === `issue-${t.issue}` && !ids.has(t.id), 'invalid-or-duplicate-task');
       ids.add(t.id);
-      insist(t.revision === 1 && t.profile === 'repository-docs-v1', 'unsupported-revision-or-profile');
+      insist(t.revision === 1 && t.profile === (code ? codeProfile : 'repository-docs-v1'), 'unsupported-revision-or-profile');
       insist(typeof t.purpose === 'string' && t.purpose.length > 0 && t.purpose.length <= 300 && typeof t.acceptance === 'string' && t.acceptance.length > 0, 'purpose-required');
-      insist(t.allowedFiles?.length === 1 && new RegExp(`^docs/changes/issue-${t.issue}-[a-z0-9-]+\\.md$`).test(t.allowedFiles[0]), 'forbidden-scope');
-      insist(t.branch === `docs/${t.issue}-harness`, 'stable-branch-required');
+      insist(code ? t.issue === 253 && JSON.stringify(t.allowedFiles) === JSON.stringify(codeFiles) : t.allowedFiles?.length === 1 && new RegExp(`^docs/changes/issue-${t.issue}-[a-z0-9-]+\\.md$`).test(t.allowedFiles[0]), 'forbidden-scope');
+      insist(t.branch === `${code ? 'fix' : 'docs'}/${t.issue}-harness`, 'stable-branch-required');
       insist(Array.isArray(t.contextFiles) && t.contextFiles.length > 0 && t.contextFiles.length <= 30 && t.contextFiles.every(p => typeof p === 'string' && /^[a-zA-Z0-9_./-]+$/.test(p) && !p.split('/').includes('..') && !/(^|\/)(\.env|\.git\/|auth\.json|\.secrets)/.test(p)), 'invalid-context');
-      insist(JSON.stringify(t.operations) === JSON.stringify(['generate-document', 'verify', 'push-branch', 'create-draft', 'observe-ci']), 'forbidden-operation');
-      insist(t.exclusions === 'product,ci,harness,policy,auth,tests,dependencies,adoption,issue-close,merge,deploy', 'exclusions-required');
+      insist(JSON.stringify(t.operations) === JSON.stringify([code ? 'generate-code' : 'generate-document', 'verify', 'push-branch', 'create-draft', 'observe-ci']), 'forbidden-operation');
+      insist(t.exclusions === `${code ? 'other-product-changes' : 'product'},ci,harness,policy,auth,tests,dependencies,adoption,issue-close,merge,deploy`, 'exclusions-required');
       insist(Array.isArray(t.dependencies) && t.dependencies.every(id => ids.has(id) && id !== t.id), 'dependency-order-or-cycle');
       continue;
     }

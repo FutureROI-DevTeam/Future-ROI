@@ -136,3 +136,24 @@ Docker回帰はruntime欠落時にskipせず失敗する。ApplicationにDocker�
 詳細な[実装・検証記録](../changes/issue-340-development-harness.md)を参照する。
 
 実Issueのレビュー枠は、operatorが対象headとレビューのreferenceを持つJSONを `acknowledge-review STATE issue-N evidence.json` へ渡すことで解放する。これは文書成果物のレビュー記録で、製品採択・GitHub Issue Close・mergeではない。CLIは自動でこの記録を作らず、ci-waitや別head・取消/未確定状態を拒否する。
+
+## 限定コード修正（#253）
+
+`issue-253-points-v1` は依頼者が採択した整数部の桁落ち修正専用。通常workerは `SaveFeedback.tsx` / `DraftProgressPreview.tsx` の2ファイルだけを生成できる。新規file、削除、rename、symlink、mode変更、テスト・CI・policy変更は拒否する。任意Issueの実装器ではない。
+
+固定mainを `git archive` した公開sourceだけをcontextとして `code-validator.Dockerfile` でimageを構築する。既存lockによる `npm ci --ignore-scripts`、prediction build、Chromiumを含み、構築時のnetworkと、候補を実行するnetwork-none環境を分ける。image IDとbaseline labelを契約に固定する。候補はread-only file mount、検査・依存・結果保存先はread-only、書込みは/tmpのみ。既存CDP runnerを再利用し、候補をtrusted Node processへimportせずChromiumで実行する。Chromium自身のsandboxはcontainer内で無効であり、境界はDockerのnon-root/read-only/cap-drop/no-new-privileges/network-noneである。
+
+```powershell
+$stateDir = '.local/harness-340-codex-live'
+node scripts/development-harness/cli.mjs enroll $stateDir scripts/development-harness/issue-253-contract.json
+node scripts/development-harness/cli.mjs prepare-issue $stateDir issue-code-253-v1
+# 別コンテキストreviewerがcandidate.patch、結果、候補headを確認。
+# review.json: {"head":"実際の候補SHA","blocking":0,"reference":"独立レビューと再確認の証拠"}
+node scripts/development-harness/cli.mjs record-code-review $stateDir issue-253 review.json
+node scripts/development-harness/cli.mjs publish $stateDir issue-253
+node scripts/development-harness/cli.mjs ci $stateDir issue-253
+```
+
+`run-issues` でもコード成果物の生成後は独立レビュー待ちで停止する。通常workerはレビュー証拠を生成しない。`record-code-review` はoperatorが記録し、別head・Blockingあり・稼働中を拒否する。修復headでは以前の証拠を使用できない。人間のApproveやレビュー枠の解放とは別操作である。停止/復旧/必須修正は上記の共通コマンドのIDを `issue-253` にする。同Issueの再enrollや別revisionで予算を初期化しない。コード修正PRとハーネスの検査追加PR #344は別にレビューする。どちらもmerge・配備しない。
+
+型/build・既存保存/試算回帰・実Chromiumの固定期待値をローカルで検査する。PR後の必須4checkはpublisherがsource/checkout/run/attempt/Appを再照合する。実画面の限定確認は実利用者やscreen readerの受入ではない。構築・診断の機械時間は実装記録、worker時間は同じ累積台帳へ残し、人の時間・総費用は未計測ならnull。

@@ -3,9 +3,12 @@ import { initialize, transaction, enroll, nextTask, requestCancel, resumeCancell
 import { runOne, recover } from './runtime.mjs';
 import { runDocument } from './docs-runtime.mjs';
 import { publishDraft, observeCI } from './github.mjs';
+import { runCode } from './code-runtime.mjs';
+import { isCode, recordCodeReview } from './code-profile.mjs';
 
 const [action, directory, target, input] = process.argv.slice(2);
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
+const runIssue = () => transaction(directory, s => isCode(s.batches[target].contract)) ? runCode(directory, target) : runDocument(directory, target);
 try {
   if (!directory) { throw new Error('usage: cli.mjs init|enroll|status|run|cancel|recover|resume|repair|accept-fixture STATE_DIR [TARGET] [INPUT]'); }
   let result;
@@ -20,16 +23,18 @@ try {
     case 'repair': transaction(directory, s => authorizeRepair(s, target, json(input))); result = { state: 'repair-authorized' }; break;
     case 'accept-fixture': transaction(directory, s => acceptFixture(s, target)); result = { state: 'local-fixture-accepted; no-issue-close' }; break;
     case 'acknowledge-review': transaction(directory, s => acknowledgeReview(s, target, json(input))); result = { state: 'artifact-review-acknowledged; no-issue-close' }; break;
+    case 'record-code-review': transaction(directory, s => recordCodeReview(s, target, json(input))); result = { state: 'independent-code-review-recorded; not-human-approval' }; break;
     case 'publish': result = publishDraft(directory, target); break;
     case 'ci': result = observeCI(directory, target); break;
-    case 'prepare-issue': result = await runDocument(directory, target); if (result.state !== 'artifacts-ready') { process.exitCode = 1; } break;
+    case 'prepare-issue': result = await runIssue(); if (result.state !== 'artifacts-ready') { process.exitCode = 1; } break;
     case 'run-issues': {
       const results = [];
       for (;;) {
         const next = transaction(directory, s => nextTask(s, target));
         if (!next.id) { results.push(next); break; }
-        const outcome = await runDocument(directory, target); results.push(outcome);
+        const outcome = await runIssue(); results.push(outcome);
         if (outcome.state !== 'artifacts-ready') { process.exitCode = 1; break; }
+        if (transaction(directory, s => isCode(s.batches[target].contract))) { results.push({ reason: 'independent-code-review-required', id: next.id }); break; }
         results.push(publishDraft(directory, next.id)); results.push(observeCI(directory, next.id));
       }
       result = results; break;
