@@ -67,7 +67,7 @@ local-fixture modeはモデルを呼ばず手動proposalを適用する比較入
 
 ## 起動
 
-Node、Git、既存Docker Engineを使用する。Docker Desktopが停止していれば利用者環境の通常手順で起動する。候補へGit管理領域、host HOME、Docker socket、credentialを渡さない。
+Node、Git、既存Docker Engineを使用する。Docker Desktopが停止していれば利用者環境の通常手順で起動する。候補へhostのGit管理領域、HOME、Docker socket、credentialを渡さない。文書検査の合成Git metadataは公開baselineだけから別に作る。
 
 以下はコミット済みの専用checkoutで行うPowerShell例。状態保存先は同じものを使い続ける。別ディレクトリへの台帳再作成や手編集は予算の再開方法ではない。
 

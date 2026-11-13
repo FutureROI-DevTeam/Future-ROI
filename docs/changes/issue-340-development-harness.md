@@ -150,6 +150,7 @@ mainは現在active rulesetsで保護され、既存GitHub認証にpush権限が
 | IR-05 Blocking／同jobログ取得 | ghがANSI入り実ログを拒否しCI照合不能 | raw取得だけallow-escape-sequences、表示せずANSI除去後SHA抽出。既存実runと#346の完了jobで確認 | 再確認済み。Job/Check ID不一致仮説は実レスポンス一致を根拠に棄却 |
 | CR-04 Blocking／e62f328＋途中accounted | 禁止fixture publishでundefined予算を加算し、300000がJSONnullへ破損 | accounting前のmode/権限確認＋正のsafe integer。8810e4bで拒否前後の台帳完全一致、独立9/9 | 再確認済み |
 | IR-06 Blocking／e980ad5 | 本文言及だけの#344は偽競合。一方exact pathだけに絞ると同Issue別filenameを見逃す | 全open PRとIssue言及closed PRの実filesを確認。同Issue文書prefix/rename前も拒否、#344の別scopeは許可。6c2afbcで元経路を独立再確認 | 再確認済み。過去PR全件を意味的に理解したとは主張しない |
+| SR-01 Blocking／a4bad24のCI再観測 | API例外で以前のreview-ready/ci.passedが残り、受入可能。観測中の必須修復もhead一致だけでreadyへ上書きし得る | 観測・予算確認前にci-waitへ失効、UUID＋head/state/active/write/cancelで完了CAS。旧/新原コードのGitHub I/Oだけを隔離stubにし、旧版の受入true→修正版falseを独立再現。予算切れ/修復競合/別観測/取消を含む12回帰成功 | 再確認済み。通常の実#346 CIを新経路で再観測しreadyへ復帰、head不変 |
 
 実Issueの独立レビューは実装担当とは別コンテキストで行い、reviewerは対象コードを変更していない。文書の内容確認、台帳/commit/Docker照合、指摘の再現を実施した。総意を安全証明にせず、残る範囲は下記へ限定する。
 
@@ -166,3 +167,5 @@ mainは現在active rulesetsで保護され、既存GitHub認証にpush権限が
 #346 の必須4件すべて成功。Application `43363636257` とFoundation `43363636182`（各attempt1）のjobログから、checkout `bc38b92dc48d2705f847b9e951db5d4e5c042ec8`／source head `e8e19098bd87f476b8c4cf2893124915d588c2a6` を取得し、App15368・必須step・現在のPR merge SHAと照合した。台帳は `review-ready / ci.passed:true`、active/writeIntentなし。独立reviewerもGitHub APIと各実jobログを直接確認した。headを変更せず、人の文書レビューと#331の採択判断を待つ。
 
 最後に同じDraftへの必須修正FF経路の無害IO回帰を追加し、push1・POST0・旧CI破棄・draft-createdへの復帰を確認した。戻り値が古いartifacts-readyになる表示の不整合を修正した。docs/publisher回帰は10/10成功（既存9件と重複加算しない）。実PRへ不要な修正は加えていない。実装PR #344 の最終headのCIはPR側の実runとIssue開発情報で追跡する。
+
+その後SR-01の必須修正を加え、docs/publisher12/12、隣接状態/Codex/ci-reportを含む34/34、skip0で再確認した。a4bad24の実装PR CI4件も成功済み（Application43364555164/Foundation43364555125、attempt1、checkout97d017016affa7ab0f2b2bac7d96802bfd6e326e）だが、後続修正のCIへ流用しない。新しい最終headをpushし、全必須CIと実checkoutを別に確認する。

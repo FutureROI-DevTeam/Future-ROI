@@ -184,12 +184,24 @@ export function validateChecks(head, checks, runs, jobs, checkout) {
       job.steps.every(s => s.conclusion === 'success' || (s.conclusion === 'skipped' && /Retain safe failure diagnostics|Upload Playwright/.test(s.name)));
   });
 }
-export function observeCI(directory, id) {
-  return accounted(directory, id, 30000, () => observeChecks(directory, id));
+export function observeCI(directory, id, inspect = observeChecks) {
+  const t = transaction(directory, s => {
+      const task = s.tasks[id];
+      if (!task?.pr || task.active || task.writeIntent || !['draft-created', 'ci-wait', 'review-ready'].includes(task.state)) { throw new Error('ci-not-published'); }
+      task.state = 'ci-wait'; task.ciObservation = randomUUID();
+      if (task.ci) { task.ci.passed = false; }
+      task.resumeReason = 'ci-observation-incomplete; do-not-reuse-previous-success';
+      return task;
+  });
+  return accounted(directory, id, 30000, () => inspect(directory, id, t));
 }
-function observeChecks(directory, id) {
-  const t = transaction(directory, s => s.tasks[id]);
-  if (!t?.pr || t.active || t.writeIntent || !['draft-created', 'ci-wait', 'review-ready'].includes(t.state)) { throw new Error('ci-not-published'); }
+export function saveCIObservation(s, id, observed, evidence) {
+  const current = s.tasks[id];
+  if (current.head !== observed.head || current.ciObservation !== observed.ciObservation || current.state !== 'ci-wait' || current.active || current.writeIntent || current.cancelRequested) { throw new Error('ci-head-or-state-race'); }
+  current.ci = evidence; current.state = evidence.passed ? 'review-ready' : 'ci-wait';
+  current.resumeReason = evidence.passed ? 'human-document-review-and-adoption-decision; head-frozen' : 'observe-required-ci-for-same-head';
+}
+function observeChecks(directory, id, t) {
   const pr = api(endpoint(`pulls/${t.pr}`));
   const contract = transaction(directory, s => s.batches[t.batchId].contract);
   if (api(endpoint('branches/main')).commit.sha !== contract.baseSha) { throw new Error('baseline-changed-revalidation-required'); }
@@ -203,10 +215,6 @@ function observeChecks(directory, id) {
   }
   const passed = validateChecks(t.head, checks, relevant, jobs, pr.merge_commit_sha);
   const evidence = { head: t.head, mergeCheckout: pr.merge_commit_sha, observedAt: Date.now(), checks, runs: relevant, jobs, passed };
-  transaction(directory, s => {
-    if (s.tasks[id].head !== t.head) { throw new Error('ci-head-race'); }
-    s.tasks[id].ci = evidence; s.tasks[id].state = passed ? 'review-ready' : 'ci-wait';
-    s.tasks[id].resumeReason = passed ? 'human-document-review-and-adoption-decision; head-frozen' : 'observe-required-ci-for-same-head';
-  });
+  transaction(directory, s => saveCIObservation(s, id, t, evidence));
   return { state: passed ? 'review-ready' : 'ci-wait', pr: t.pr, head: t.head };
 }

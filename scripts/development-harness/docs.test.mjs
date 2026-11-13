@@ -5,9 +5,30 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateContract, emptyLedger, enroll, nextTask, reserve, finish, initialize, transaction, acceptFixture, requestCancel, resumeCancelled } from './state.mjs';
 import { validateDocument } from './docs-runtime.mjs';
-import { classifyWork, observeWork, publishDraft, validateChecks, requiredJobs, requiredSteps, checkoutEvidence, accounted, pages } from './github.mjs';
+import { classifyWork, observeWork, publishDraft, observeCI, saveCIObservation, validateChecks, requiredJobs, requiredSteps, checkoutEvidence, accounted, pages } from './github.mjs';
 const contract = () => JSON.parse(readFileSync(new URL('./issue-331-contract.json', import.meta.url)));
 const head = 'a'.repeat(40);
+test('CI再観測が失敗したら以前のreview-readyを使い続けない', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'roi-ci-error-'));
+  try {
+    initialize(dir); transaction(dir, s => { enroll(s, contract()); Object.assign(s.tasks['issue-331'], { head, pr: 346, state: 'review-ready', ci: { passed: true } }); });
+    assert.throws(() => observeCI(dir, 'issue-331', () => { throw new Error('network-unavailable'); }), /network-unavailable/);
+    const task = transaction(dir, s => s.tasks['issue-331']);
+    assert.equal(task.state, 'ci-wait'); assert.equal(task.ci.passed, false); assert.equal(task.head, head);
+    assert.match(task.resumeReason, /incomplete/);
+    transaction(dir, s => { const t = s.tasks['issue-331']; t.state = 'review-ready'; t.ci.passed = true; t.reservedMs = contract().taskMs; });
+    assert.throws(() => observeCI(dir, 'issue-331', () => assert.fail('budget must stop request')), /operation-budget/);
+    assert.equal(transaction(dir, s => s.tasks['issue-331'].state), 'ci-wait');
+  } finally { rmSync(dir, { recursive: true }); }
+});
+test('古いCI観測は開始済み修復・別観測・取消を同じheadでも上書きしない', () => {
+  const original = { head, state: 'ci-wait', ciObservation: 'one', active: null, writeIntent: null, cancelRequested: false };
+  for (const change of [{ state: 'repair-authorized' }, { active: { container: 'live' } }, { ciObservation: 'two' }, { cancelRequested: true }]) {
+    const s = { tasks: { task: { ...original, ...change } } }, before = structuredClone(s);
+    assert.throws(() => saveCIObservation(s, 'task', original, { passed: true }), /ci-head-or-state-race/);
+    assert.deepEqual(s, before);
+  }
+});
 test('CR-04: fixtureへのpublish拒否や不明予算で累積値をnullへ破損しない', () => {
   const dir = mkdtempSync(join(tmpdir(), 'roi-budget-test-'));
   try {
