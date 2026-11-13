@@ -71,6 +71,20 @@ test('不明書込みの不在は再送許可にならない', () => {
     assert.throws(() => publishDraft(dir, 'issue-331', io), /write-still-unknown/); assert.equal(writes, 1);
   } finally { rmSync(dir, { recursive: true }); }
 });
+test('必須修正の新headは同じDraftへFFし、別PRを作らずCIを待ち直す', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'roi-repair-publish-'));
+  try {
+    const previous = 'b'.repeat(40); initialize(dir); const c = contract();
+    transaction(dir, s => { enroll(s, c); reserve(s, 'issue-331', 'c'); finish(s, 'issue-331', { container: 'c', stopped: true, passed: true, head });
+      Object.assign(s.tasks['issue-331'], { pr: 346, pushedHead: previous, ci: { passed: true, head: previous } }); });
+    let remote = { sha: previous }, pr = { number: 346, head: { sha: previous } }, pushes = 0, ancestors = 0;
+    const io = { verify() {}, observe: () => ({ remote, pr }), ancestor(oldHead, newHead) { assert.equal(oldHead, previous); assert.equal(newHead, head); ancestors++; },
+      push(newHead) { pushes++; remote = { sha: newHead }; pr = { ...pr, head: { sha: newHead } }; }, read() { assert.fail('must not create another PR'); } };
+    assert.deepEqual(publishDraft(dir, 'issue-331', io), { pr: 346, state: 'draft-created' });
+    assert.equal(pushes, 1); assert.equal(ancestors, 1);
+    assert.equal(transaction(dir, s => s.tasks['issue-331'].ci), null);
+  } finally { rmSync(dir, { recursive: true }); }
+});
 test('CIの未実行、旧head、他発行元、必須step skip、古いattemptを合格にしない', () => {
   const checks = [], runs = [], jobs = [];
   Object.entries(requiredJobs).forEach(([name, path], index) => {

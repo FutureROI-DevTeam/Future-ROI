@@ -134,3 +134,5 @@ Docker回帰はruntime欠落時にskipせず失敗する。ApplicationにDocker�
 | 費用・人の負担 | 未計測はnull | 失敗・人の引取りも含めて計測。少数fixtureの成功で削減効果を主張しない |
 
 詳細な[実装・検証記録](../changes/issue-340-development-harness.md)を参照する。
+
+実Issueのレビュー枠は、operatorが対象headとレビューのreferenceを持つJSONを `acknowledge-review STATE issue-N evidence.json` へ渡すことで解放する。これは文書成果物のレビュー記録で、製品採択・GitHub Issue Close・mergeではない。CLIは自動でこの記録を作らず、ci-waitや別head・取消/未確定状態を拒否する。

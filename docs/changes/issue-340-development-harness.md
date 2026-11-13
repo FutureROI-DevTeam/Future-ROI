@@ -119,3 +119,50 @@ mainは現在active rulesetsで保護され、既存GitHub認証にpush権限が
 事前失敗仮説: 旧Issue本文だけを読んで解消済みalertを再報告する、TypeScript供給元を親実験環境と誤記する、docs-only CIを依存分離の証拠にする、候補branchへハーネス差分が混ざる、応答喪失を再POSTする、古いmerge成功を流用する。固定source/lock抽出/最新コメント、差分制限、隔離検査、台帳CAS、実runログで反証する。モデルの比較文書は独立レビュー対象とする。
 
 途中独立診断IR-01〜04: 古いwrite-intent照合が新Draft intentを消す競合、取消後照合の行き止まり、CI checkout/必須step欠落、観測APIの共通期限欠落を確認。UUIDとCAS、取消中read-only照合、実checkout＋必須step、共通deadlineと観測予約/実測を追加した。無害な交錯・応答喪失・skip・古いSHA・遅いpaginationの回帰で再確認する。修正前はBlocking、最終状態は後続の検証記録を参照。
+
+## 実Issue経路の実接続（2026-11-13）
+
+現在の到達点は実Issue #331 の限定比較資料をCodexが生成し、隔離検査から実Draftへ接続した状態である。上記fixture-only、main未保護、publisher未接続は各時点の履歴。ハーネス実装は[Draft #344](https://github.com/FutureROI-DevTeam/Future-ROI/pull/344)、新ハーネスの実証成果は[Draft #346](https://github.com/FutureROI-DevTeam/Future-ROI/pull/346)。両IssueはOpenのままで、製品判断・採択・merge・配備を行っていない。
+
+### 実接続と検証証拠
+
+- 基準main: `7beba614697ecc3098cde122e2f0305842962812`。候補: `e8e19098bd87f476b8c4cf2893124915d588c2a6`、branch `docs/331-harness`。mainを親とする比較文書1ファイル81行だけの追加であり、ハーネス差分を含まない。
+- 生成・隔離検査controller: `8810e4bb648a0157237d5b4df15faf03771eb44c`。publisher: `6c2afbc4cc100e22394e76106f01e52fce6ad6ba`。最初の試行はe62f328＋未commit adapterであり、e62f328単独の実証とはしない。
+- 同じ `.local/harness-340-codex-live/ledger.json` を継続使用。過去fixtureのattempt/費用不明/消費を保持し、独立検証済みfixtureのみ受入記録で枠を解放した。#331 はattempt2・モデル起動予約2、生成前の観測を含む予約660000msを発行前に累積保持。以後のpublisher/CI観測も同じtask/batchへ加算する。
+- Codexの実入力/outputは初回10349/3424、2回目10406/3300 tokens。総費用、人の操作・レビュー・復旧時間、誤完了率、費用削減は未計測null。成功PR数を成果指標にしない。
+- attempt1は生成・隔離拒否5件まで成功したが、Foundationが個別15秒制限を超えて停止。無認証read-onlyの同じ固定検査を単独再実行して成功を確認。attempt全体300秒は維持し、個別commandを残時間内の最大180秒へ修正。attempt2でFoundationと固定ci-report6/6、skip0、policy/検査入口/結果/symlink書込み拒否5件が成功し、Docker停止後にcommitを作成した。
+- attempt2のproposal、snapshot文書、candidate commit本文が完全一致することを独立reviewerが確認。manifest・3lock・workflow・runtime・最新Issue commentの元情報から文書の事実と未採択境界を照合し、Blocking/Should Fixなし。
+- ローカル全体: 8810e4bで41/41成功、skip/cancel/todo0（状態12、portable4、固定CLI偽認証/実process4、Docker6、docs/publisher9、ci-report6）。先の並列実行では中断試験1件が失敗し、証拠を保持したうえで単独6/6・全体順次41/41を再実行。基準やassertionを緩めていない。6c2afbcの変更境界31/31も成功。Foundationは125文書・2898リンクの検査に成功。
+- 外部ファイル負例: hostに無害canaryを置き、snapshot文書からrepo外のcanaryへリンクした検査はmissing linkの1条件だけで失敗。リンクを除いた対照は成功。`.local/docs-outside-probe.log` と `docs-outside-control.log` に保存。候補のリンク解決をhost上では実行しない。
+- 実PR作成後のCIは台帳 `tasks.issue-331.ci` にrun/attempt/job/check/発行元/実checkoutを保存する。Foundation run `43363636182`、Application run `43363636257`、どちらもattempt1。実merge checkoutは `bc38b92dc48d2705f847b9e951db5d4e5c042ec8`、source headは上記e8e1909。必須CIの最終照合は後続記録を参照。
+- `run-issues` の同batch再送で追加生成・attempt増加・head更新なし。レビュー待ち上限1を維持し、稼働目的で仕事を追加しない。
+
+8810e4b試行receiptの `existingCheck.checkoutSha` は検査ソースの基準mainを格納していた。実際の合成snapshot Git HEADは `2e6bffec0ab70e00d6f2032e5916dee6bfadb9e0` で、候補文書はそのsnapshotの未追跡ファイルだった。6c2afbc以後は実際の `snapshotGitHead` とsnapshot内容の区分を記録する。旧receiptは改変しない。PR後CIの実checkoutはjobログから別に確認しており、基準mainを実checkoutへ読み替えない。
+
+### 今回の独立診断・修正・再確認
+
+| ID・重大度／対象 | 確認した成立条件と影響 | 最小修正と再確認の証拠 | 最終状態・限界 |
+| --- | --- | --- | --- |
+| IR-01 Blocking／e62f328＋途中github差分 | Aの古いpush照合がBの新Draft intentを消し、POST2回。各transaction lockだけではsnapshot競合を防げない | intent UUID＋CAS。nested controller再現でPOST1回、別intentの上書きを拒否。8810e4b回帰・独立再実行 | 再確認済み。実GitHubへの応答喪失注入はせず無害IOで検証 |
+| IR-02 Blocking／同publisher | cancel中の照合拒否とresumeの未確定拒否が両立し復旧不能 | cancel中もread-only照合、新規POST0。取消flag維持、照合後resumeを回帰確認 | 再確認済み |
+| IR-03 Blocking／同CI判定 | Set up jobだけでも成功、実runのcheckout未照合で古いmergeを流用し得る | 固定必須step集合、実jobログのcheckout/source、App15368/run/attempt照合。step欠落/skip/旧checkout/旧attemptを拒否 | 再確認済み。文書意味・採択はCIの外でレビュー |
+| IR-04 Blocking／同API予算 | 各ページtimeoutだけで総時間が延長され、観測費用が累積されない | 共通deadline、事前予約、実経過/超過記録。遅いpaginationを途中停止しJSON再読でも累積保持 | 再確認済み。20ms実時計試験のI/O依存をfake時計へ修正、条件を維持 |
+| IR-05 Blocking／同jobログ取得 | ghがANSI入り実ログを拒否しCI照合不能 | raw取得だけallow-escape-sequences、表示せずANSI除去後SHA抽出。既存実runと#346の完了jobで確認 | 再確認済み。Job/Check ID不一致仮説は実レスポンス一致を根拠に棄却 |
+| CR-04 Blocking／e62f328＋途中accounted | 禁止fixture publishでundefined予算を加算し、300000がJSONnullへ破損 | accounting前のmode/権限確認＋正のsafe integer。8810e4bで拒否前後の台帳完全一致、独立9/9 | 再確認済み |
+| IR-06 Blocking／e980ad5 | 本文言及だけの#344は偽競合。一方exact pathだけに絞ると同Issue別filenameを見逃す | 全open PRとIssue言及closed PRの実filesを確認。同Issue文書prefix/rename前も拒否、#344の別scopeは許可。6c2afbcで元経路を独立再確認 | 再確認済み。過去PR全件を意味的に理解したとは主張しない |
+
+実Issueの独立レビューは実装担当とは別コンテキストで行い、reviewerは対象コードを変更していない。文書の内容確認、台帳/commit/Docker照合、指摘の再現を実施した。総意を安全証明にせず、残る範囲は下記へ限定する。
+
+### 残る設定・未確認
+
+- mainは現在protected:true。active rulesets（27171824/27172127）の共通main安全条件・必須4checkを確認済み。Notion改訂v3の13〜19節も再参照したが、未適用という末尾記録は現在のGitHub実状態へ優先しない。
+- AW v1.2.2は購読認証非対応。今回のローカルCLI→Draft→CIに追加認証/Secrets/保護変更は不要。将来AWを使う場合のみAPIキーまたはCopilot権限、固定版compiler/lock/拒否probeが別途必要。
+- GitHub Projectsは既存gh認証にread:projectがなく、MCPでも対象Projectを取得できなかった。Project Status更新は未実施。必要なら対象Projectへの既存接続を直すか、別途project権限を判断する。Issue/PR本文の開発情報は更新するがProjectsを更新済みとはしない。
+- #331の比較対象の採択、依存の移設/更新、旧比較の再現、実人による受入は未実施。docs-onlyでQuestion prior UI candidate workflowは起動しない。製品画面変更はないので全画面/端末/実人試験を追加していない。
+- publisherの同じDraftへの必須修正FF経路はローカル検証・コード確認の範囲。今回の実PRに不要な修正を注入して試さない。実本番データ・秘密を使う攻撃試験、一般的なcontainer escape証明、無制限/任意Issue運用、費用や人手削減は未確認。
+
+### 実証Draftの最終CI照合
+
+#346 の必須4件すべて成功。Application `43363636257` とFoundation `43363636182`（各attempt1）のjobログから、checkout `bc38b92dc48d2705f847b9e951db5d4e5c042ec8`／source head `e8e19098bd87f476b8c4cf2893124915d588c2a6` を取得し、App15368・必須step・現在のPR merge SHAと照合した。台帳は `review-ready / ci.passed:true`、active/writeIntentなし。独立reviewerもGitHub APIと各実jobログを直接確認した。headを変更せず、人の文書レビューと#331の採択判断を待つ。
+
+最後に同じDraftへの必須修正FF経路の無害IO回帰を追加し、push1・POST0・旧CI破棄・draft-createdへの復帰を確認した。戻り値が古いartifacts-readyになる表示の不整合を修正した。docs/publisher回帰は10/10成功（既存9件と重複加算しない）。実PRへ不要な修正は加えていない。実装PR #344 の最終headのCIはPR側の実runとIssue開発情報で追跡する。

@@ -117,8 +117,8 @@ function publish(directory, id, io = { read: api, observe: observeWork, push: (h
   if (task.cancelRequested) { return { state: 'cancelled; reconciled-only', pr: task.pr ?? null }; }
   if (observed.pr && observed.pr.head.sha === task.head && observed.remote?.sha === task.head) {
     if (!task.pr || task.pr !== observed.pr.number) { throw new Error('unowned-existing-pr'); }
-    transaction(directory, s => { if (s.tasks[id].state === 'artifacts-ready') { s.tasks[id].state = 'draft-created'; s.tasks[id].ci = null; } });
-    return { pr: task.pr, state: task.state };
+    const state = transaction(directory, s => { if (s.tasks[id].state === 'artifacts-ready') { s.tasks[id].state = 'draft-created'; s.tasks[id].ci = null; } return s.tasks[id].state; });
+    return { pr: task.pr, state };
   }
   if (!['artifacts-ready'].includes(task.state)) { throw new Error('not-publishable'); }
   // Reserve the entire bounded publisher operation before any write; never refund/reset it.
@@ -132,7 +132,7 @@ function publish(directory, id, io = { read: api, observe: observeWork, push: (h
   if (!observed.remote || observed.remote.sha !== task.head) {
     if (observed.remote) {
       if (!task.pr || observed.remote.sha !== task.pushedHead || observed.pr?.number !== task.pr) { throw new Error('unowned-existing-branch'); }
-      command('git', ['merge-base', '--is-ancestor', observed.remote.sha, task.head]);
+      (io.ancestor ?? ((oldHead, newHead) => command('git', ['merge-base', '--is-ancestor', oldHead, newHead])))(observed.remote.sha, task.head);
     }
     intent('push');
     io.push(task.head, spec.branch);
