@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateContract, emptyLedger, enroll, nextTask, reserve, finish, initialize, transaction, acceptFixture, requestCancel, resumeCancelled } from './state.mjs';
 import { validateDocument } from './docs-runtime.mjs';
-import { classifyWork, publishDraft, validateChecks, requiredJobs, requiredSteps, checkoutEvidence, accounted, pages } from './github.mjs';
+import { classifyWork, observeWork, publishDraft, validateChecks, requiredJobs, requiredSteps, checkoutEvidence, accounted, pages } from './github.mjs';
 const contract = () => JSON.parse(readFileSync(new URL('./issue-331-contract.json', import.meta.url)));
 const head = 'a'.repeat(40);
 test('CR-04: fixtureへのpublish拒否や不明予算で累積値をnullへ破損しない', () => {
@@ -42,6 +42,9 @@ test('全状態PRと別名branch・foreign repo・既存headを照合する', ()
   const implementation = { ...pr, number: 344, head: { ...pr.head, ref: 'chore/340-development-harness' }, body: 'Demonstration #331 will be a separate PR.', scopeOverlap: false };
   assert.equal(classifyWork(spec, task, [], [implementation]).pr, null);
   assert.throws(() => classifyWork(spec, task, [], [{ ...implementation, scopeOverlap: true }]), /existing-pr-conflict/);
+  const existing = { ...implementation, body: 'Refs #331', head: { ...implementation.head, ref: 'docs/dependency-options' } };
+  const read = path => path.includes('/branches?') ? [] : path.includes('/files?') ? [{ filename: 'docs/changes/issue-331-existing-options.md' }] : [existing];
+  assert.throws(() => observeWork(spec, task, read), /existing-pr-conflict/);
 });
 test('push成功応答喪失後はremote照合、PR成功応答喪失後も再作成しない', () => {
   const dir = mkdtempSync(join(tmpdir(), 'roi-publisher-test-'));

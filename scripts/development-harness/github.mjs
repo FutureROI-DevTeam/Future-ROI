@@ -66,8 +66,10 @@ export function observeWork(spec, task, read = api) {
   // A mention in the implementation PR is not a second execution of the demonstration.
   // Inspect the referenced PR's actual paths; do not ignore an overlap under another branch.
   const issueRef = new RegExp(`(?:#|issues/)${spec.issue}(?![0-9])`);
+  const issueDocument = new RegExp(`^docs/changes/issue-${spec.issue}-[a-z0-9-]+\\.md$`);
   for (const pr of prs.filter(p => p.state === 'open' || issueRef.test(p.body ?? ''))) {
-    pr.scopeOverlap = pages(`pulls/${pr.number}/files`, null, read).some(f => spec.allowedFiles.includes(f.filename) || spec.allowedFiles.includes(f.previous_filename));
+    pr.scopeOverlap = pages(`pulls/${pr.number}/files`, null, read).some(f => [f.filename, f.previous_filename].filter(Boolean).some(path =>
+      spec.allowedFiles.includes(path) || issueDocument.test(path)));
   }
   const local = command('git', ['for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/heads']).trim().split(/\r?\n/).filter(Boolean)
     .map(line => { const [branch, sha] = line.split(' '); return { branch, sha }; });

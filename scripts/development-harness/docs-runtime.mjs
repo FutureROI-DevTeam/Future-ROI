@@ -59,7 +59,7 @@ export async function runDocument(directory, batchId) {
   writeFileSync(join(results, 'result.json'), '{"status":"not-run"}\n');
   writeFileSync(join(policy, 'canary'), 'host-owned');
   writeFileSync(join(policy, 'gitconfig'), '[safe]\n\tdirectory = /snapshot\n');
-  let creationAttempted = false, created = false, stopped = false, passed = false, head = null, isolation = null, model = null, record = null, diagnostic = 'document-verification-failed', stage = 'model';
+  let creationAttempted = false, created = false, stopped = false, passed = false, head = null, isolation = null, model = null, record = null, snapshotGitHead = null, diagnostic = 'document-verification-failed', stage = 'model';
   const run = (bin, args, options = {}) => {
     timeRemaining(deadline - 15000);
     return command(bin, args, { ...options, timeout: Math.min(180000, deadline - Date.now() - 15000) });
@@ -76,6 +76,7 @@ export async function runDocument(directory, batchId) {
     run('git', ['init', '--template=', snapshot]);
     run('git', ['-C', snapshot, '-c', 'core.autocrlf=false', 'add', '--all']);
     run('git', ['-C', snapshot, '-c', 'user.name=Harness', '-c', 'user.email=harness@example.invalid', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'baseline']);
+    snapshotGitHead = run('git', ['-C', snapshot, 'rev-parse', 'HEAD']).trim();
     mkdirSync(join(snapshot, 'docs/changes'), { recursive: true });
     writeFileSync(join(snapshot, spec.allowedFiles[0]), text);
     if (transaction(directory, s => s.tasks[id].cancelRequested)) { throw new Error('cancelled'); }
@@ -97,7 +98,7 @@ export async function runDocument(directory, batchId) {
     if (countProblems(counts, false, true).length) { throw new Error('existing-check-incomplete'); }
     stage = 'foundation';
     inside(['pwsh', '-NoProfile', '-File', '/snapshot/scripts/check-foundation.ps1']);
-    record = safeRecord({ layer: 'foundation', sourceSha: base, checkoutSha: base, exitCode: 0, status: 'passed', durationMs: Date.now() - attempt.startedAt, counts, scope: 'node-tests', diagnostic: 'none' });
+    record = safeRecord({ layer: 'foundation', sourceSha: base, checkoutSha: snapshotGitHead, exitCode: 0, status: 'passed', durationMs: Date.now() - attempt.startedAt, counts, scope: 'node-tests', diagnostic: 'none' });
     stopAndConfirm(name, deadline); stopped = true;
     if (transaction(directory, s => s.tasks[id].cancelRequested || s.tasks[id].active?.container !== name)) { throw new Error('cancelled'); }
     const env = { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, GIT_INDEX_FILE: join(folder, 'index'),
@@ -121,7 +122,8 @@ export async function runDocument(directory, batchId) {
     const active = transaction(directory, s => s.tasks[id].active);
     stopped = !active?.authHome && ['model-stopped', 'model-preflight'].includes(active?.phase);
   }
-  const receipt = { container: name, stopped, passed: passed && stopped, head, diagnostic, baselineSha: base,
+  const receipt = { container: name, stopped, passed: passed && stopped, head, diagnostic, baselineSha: base, snapshotGitHead,
+    snapshotContent: 'fixed-main-with-exact-untracked-document',
     controllerSha: command('git', ['rev-parse', 'HEAD']).trim(), isolation, model, existingCheck: record, validatorImage: contract.validatorImage,
     externalCI: 'not-run', totalCostCents: null };
   writeFileSync(join(results, 'result.json'), JSON.stringify(receipt, null, 2) + '\n');
