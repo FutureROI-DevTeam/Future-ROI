@@ -2,6 +2,8 @@
 
 この文書は、Issue #10とIssue #28で整理したツール利用方針の正本です。共通の開発ルールは [CONTRIBUTING](CONTRIBUTING.md) を参照してください。
 
+作業に必要な説明は[文書入口](docs/README.md)、読み込む範囲・引継ぎ・独立レビューの渡し方は[コンテキストの組み立て方](CONTRIBUTING.md#aiへ渡すコンテキスト)から選びます。ツールの追加より先に、既存の実装・確認方法を調べます。
+
 ## 採択済みの運用方針
 
 2026-09-19に採択した3点のうち、GitHub操作の基本手段は2026-09-23の明示決定（Issue #28）でAIエージェント向けに変更しました。Playwrightとdocumentation-syncの方針は維持します。
@@ -22,7 +24,7 @@ Issue #47の[ML Agent Harness](https://github.com/jogi-hack-2026-team/jogi-hack-
 ## 利用前の確認
 
 - GitHub MCP：利用前にツールの公開、認証、対象リポジトリとProjectへの権限を確認する。未接続・権限不足は未確認として扱う。
-- Playwright：この変更ではCLIやSkillの導入・設定、E2E整備を行わない。リポジトリ内にPlaywright専用Skill・設定はなく、各環境の導入状況は利用前に確認する。
+- ブラウザ検証：既存の[Chrome/CDP回帰と実API・隔離DBの継続E2E](docs/DEVELOPMENT_GUIDE.md#検証)を優先する。これはPlaywrightの導入確認とは別。Playwright CLI＋Skillが必要な場合は、その環境での検出・本文・依存ツールを確認する。
 - [documentation-sync](.agents/skills/documentation-sync/SKILL.md)：既存Skillを確認済み。今回の正式採択を記録し、変更に関係する正本への影響だけを確認する。
 
 関連Issue：[旧`gh`方針 #10](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/10)、[GitHub MCPへの切り替え #28](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/28)
@@ -46,7 +48,7 @@ Issue #47の[ML Agent Harness](https://github.com/jogi-hack-2026-team/jogi-hack-
 | GitHub CLI（gh） | 2026-09-23の作業環境ではPATH上に見つからなかった。2026-10-03、KaitoのWindows環境で公式配布版の導入と、このrepoのIssue／PR読み取りを確認 | 環境・時点ごとの確認。全員の導入・書込権限や将来の接続は保証しない。AI向けの基本手段はIssue #28のGitHub MCP方針を維持し、個別の明示依頼ではその指定に従う |
 | Context7 MCP | ライブラリ仕様を確認するための接続先として利用可能 | 接続設定は各AIクライアントで確認する |
 | Serena MCP | コードベース探索用の接続先として利用可能 | 対象言語のバックエンドやシンボル探索の範囲は技術スタック決定後に確認する |
-| Playwright CLI＋Skill | リポジトリ内に専用設定・Skillはまだない | 方針は採択済み。UI実装時にCLI・Skill・E2E環境を確認する |
+| Playwright CLI＋Skill | リポジトリ内に専用設定・Skillはない。個人環境の導入状況は別に確認する | 方針は採択済み。実装済みのブラウザ検証は[開発ガイド](docs/DEVELOPMENT_GUIDE.md#検証)へ。既存のChrome/CDP runnerをPlaywright導入済みとは扱わない |
 
 未導入のツールを導入済みと扱いません。接続できない場合は未確認と記録し、無断でインストールやリポジトリ設定の追加を行わないでください。
 

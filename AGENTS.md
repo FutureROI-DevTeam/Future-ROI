@@ -55,6 +55,8 @@ Web Application
 
 Code Freeze後は、原則としてソースコードおよび事前提出資料を編集できない。
 
+大会後に明示依頼された保守は[CONTRIBUTINGの大会後の保守](CONTRIBUTING.md#大会後の保守)に従い、対象Issueの範囲で進める。大会時の提出条件と現在の保守を混同しない。
+
 そのため、
 
 - 実装量
@@ -72,6 +74,8 @@ Code Freeze後は、原則としてソースコードおよび事前提出資料
 正式な現在のProduct・Scopeは[Product Spec](docs/product-spec.md)、Architecture・技術採択・条件付き候補は[Architecture](docs/architecture.md)を確認する。採択済みでも本番実装・実User検証済みとは扱わない。過去の会話・PoC・古いIssueを現在の決定へ昇格させない。OPEN / RECOMMENDED / CONDITIONALを人間の判断なくDECIDEDへ変更しない。
 
 作業開始時は次の順に読む。
+
+[目的別の文書入口](docs/README.md#目的から読む)で該当節を選ぶ。下記は関連要件・契約を読む順序であり、全資料の全文読込を要求しない。引継ぎと根拠の更新は[AIへ渡すコンテキスト](CONTRIBUTING.md#aiへ渡すコンテキスト)に従う。
 
 1. [Product Spec](docs/product-spec.md): 対象RequirementとScope。
 2. [Architecture](docs/architecture.md): 実現責務と正式Decision。

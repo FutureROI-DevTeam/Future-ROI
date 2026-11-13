@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "7beba614697ecc3098cde122e2f0305842962812",
+  "artifactRole": "Supporting Artifact / Not a Source of Truth",
+  "reason": "Issue #341: 現在地から過去の併用経緯を全文分離する。",
+  "preserveHeadings": [
+    "docs/change-map.md"
+  ],
+  "preserveUnmovedLines": [],
+  "moves": [
+    {
+      "id": "change-map-state",
+      "source": "docs/change-map.md",
+      "destination": "docs/changes/issue-341-documentation-review.md",
+      "after": "## 現在地の読み方",
+      "before": "## コードを読むための短いtrace",
+      "destinationAfter": "<!-- change-map-state:start -->",
+      "destinationBefore": "<!-- change-map-state:end -->",
+      "headingMap": {}
+    }
+  ]
+}
