@@ -39,6 +39,9 @@ test('全状態PRと別名branch・foreign repo・既存headを照合する', ()
   }
   assert.throws(() => classifyWork(spec, task, [{ branch: 'fix/331-other', sha: head }], []), /branch-conflict/);
   assert.throws(() => classifyWork(spec, task, [], [pr, { ...pr, number: 2 }]), /ambiguous/);
+  const implementation = { ...pr, number: 344, head: { ...pr.head, ref: 'chore/340-development-harness' }, body: 'Demonstration #331 will be a separate PR.', scopeOverlap: false };
+  assert.equal(classifyWork(spec, task, [], [implementation]).pr, null);
+  assert.throws(() => classifyWork(spec, task, [], [{ ...implementation, scopeOverlap: true }]), /existing-pr-conflict/);
 });
 test('push成功応答喪失後はremote照合、PR成功応答喪失後も再作成しない', () => {
   const dir = mkdtempSync(join(tmpdir(), 'roi-publisher-test-'));
@@ -110,13 +113,14 @@ test('IR-02: cancel中もpush結果を照合でき、新規POSTは行わない',
 });
 test('IR-04: ページごとの成功で共通期限を延ばさず累積予算を保存', () => {
   const dir = mkdtempSync(join(tmpdir(), 'roi-deadline-test-'));
+  const clock = Date.now; let now = clock(); Date.now = () => now;
   try {
     initialize(dir); transaction(dir, s => enroll(s, contract())); let calls = 0;
     assert.throws(() => accounted(dir, 'issue-331', 20, () => pages('branches', null, () => {
-      calls++; const until = Date.now() + 25; while (Date.now() < until) { /* harmless bounded slow read */ }
+      calls++; now += 25;
       return Array(100).fill({});
     })), /operation-time-budget/);
     assert.equal(calls, 1); assert.ok(transaction(dir, s => s.tasks['issue-331'].reservedMs) >= 20);
     assert.ok(transaction(dir, s => s.tasks['issue-331'].actualMs) >= 25);
-  } finally { rmSync(dir, { recursive: true }); }
+  } finally { Date.now = clock; rmSync(dir, { recursive: true }); }
 });

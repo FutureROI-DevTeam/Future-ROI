@@ -49,9 +49,9 @@ export function pages(path, field, read = api) {
   throw new Error('incomplete-github-observation');
 }
 export function classifyWork(spec, task, refs, prs, localRefs = []) {
-  const issueRef = new RegExp(`(?:#|issues/)${spec.issue}(?![0-9])`);
   const branchRef = new RegExp(`(?:^|[/_-])${spec.issue}(?:$|[/_-])`);
-  const relevant = prs.filter(p => p.head?.ref === spec.branch || branchRef.test(p.head?.ref ?? '') || issueRef.test(p.body ?? ''));
+  const relevant = prs.filter(p => p.head?.ref === spec.branch || branchRef.test(p.head?.ref ?? '') || p.scopeOverlap ||
+    (p.body ?? '').includes(`<!-- future-roi-harness:issue-${spec.issue} -->`));
   if (relevant.some(p => p.head?.ref !== spec.branch || p.base?.ref !== 'main' || p.head?.repo?.full_name !== repository ||
       p.state !== 'open' || !p.draft || ![task.head, ...(task.pr ? [task.pushedHead] : [])].includes(p.head.sha) || (task.pr && p.number !== task.pr))) { throw new Error('existing-pr-conflict'); }
   if (relevant.length > 1 || (task.pr && relevant.length !== 1)) { throw new Error('ambiguous-existing-pr'); }
@@ -63,6 +63,12 @@ export function classifyWork(spec, task, refs, prs, localRefs = []) {
 export function observeWork(spec, task, read = api) {
   const branches = pages('branches', null, read).map(b => ({ branch: b.name, sha: b.commit.sha }));
   const prs = pages('pulls?state=all', null, read);
+  // A mention in the implementation PR is not a second execution of the demonstration.
+  // Inspect the referenced PR's actual paths; do not ignore an overlap under another branch.
+  const issueRef = new RegExp(`(?:#|issues/)${spec.issue}(?![0-9])`);
+  for (const pr of prs.filter(p => p.state === 'open' || issueRef.test(p.body ?? ''))) {
+    pr.scopeOverlap = pages(`pulls/${pr.number}/files`, null, read).some(f => spec.allowedFiles.includes(f.filename) || spec.allowedFiles.includes(f.previous_filename));
+  }
   const local = command('git', ['for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/heads']).trim().split(/\r?\n/).filter(Boolean)
     .map(line => { const [branch, sha] = line.split(' '); return { branch, sha }; });
   return classifyWork(spec, task, branches, prs, local);
@@ -135,7 +141,7 @@ function publish(directory, id, io = { read: api, observe: observeWork, push: (h
   intent('draft');
   io.read(endpoint('pulls'), { head: spec.branch, base: 'main', draft: true,
     title: `docs: #${spec.issue} の比較資料を追加する`,
-    body: `## 変更\n\n${spec.purpose}\n\nRefs #${spec.issue}\n\nハーネス #340 による実Issue成果物。採択・依存更新・Issue完了は含みません。\n\n## 検証\n\n固定main ${contract.baseSha} の検査を無認証のread-only環境で実行。候補head ${task.head}。PR後CIは確認待ち。総費用・人の時間は未計測。\n` });
+    body: `<!-- future-roi-harness:issue-${spec.issue} -->\n## 変更\n\n${spec.purpose}\n\nRefs #${spec.issue}\n\nハーネス #340 による実Issue成果物。採択・依存更新・Issue完了は含みません。\n\n## 検証\n\n固定main ${contract.baseSha} の検査を無認証のread-only環境で実行。候補head ${task.head}。PR後CIは確認待ち。総費用・人の時間は未計測。\n` });
   return publish(directory, id, io);
 }
 
