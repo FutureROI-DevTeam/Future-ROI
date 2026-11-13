@@ -157,3 +157,7 @@ node scripts/development-harness/cli.mjs ci $stateDir issue-253
 `run-issues` でもコード成果物の生成後は独立レビュー待ちで停止する。通常workerはレビュー証拠を生成しない。`record-code-review` はoperatorが記録し、別head・Blockingあり・稼働中を拒否する。修復headでは以前の証拠を使用できない。人間のApproveやレビュー枠の解放とは別操作である。停止/復旧/必須修正は上記の共通コマンドのIDを `issue-253` にする。同Issueの再enrollや別revisionで予算を初期化しない。コード修正PRとハーネスの検査追加PR #344は別にレビューする。どちらもmerge・配備しない。
 
 型/build・既存保存/試算回帰・実Chromiumの固定期待値をローカルで検査する。PR後の必須4checkはpublisherがsource/checkout/run/attempt/Appを再照合する。実画面の限定確認は実利用者やscreen readerの受入ではない。構築・診断の機械時間は実装記録、worker時間は同じ累積台帳へ残し、人の時間・総費用は未計測ならnull。
+
+生成済みhead/PRがない段階でmainが進んだ場合だけ、operatorは `refresh-code-base STATE BATCH updated-contract.json` で基準を更新できる。固定対象/context・検査・workflow・lockが不変、旧基準のdescendant、main保護、新imageのlabel、branch/PR照合を確認し、契約のbaseSha/image以外の変更を拒否する。作業ID・attempt・使用済み時間・model回数・期限・失敗receiptを保持し、旧fingerprintと基準をeventsに残す。review待ちheadやPR発行後はこの操作で更新できない。関連検査や対象sourceが変わった場合は再設計・レビューへ戻り、自動的に契約を拡大しない。
+
+例外は今回精査した7beba614→40ddc510の組合せに限る。#345のfull-stack.browser-check.mjs/response-interception.mjs/response-interception.test.mjsは、このprofileのローカル検査経路から参照されない既存E2E修正として許可した。その他のcode/loader/configの変更はすべて拒否し、別SHAの同名pathにも例外を流用しない。PR後の既存全CIでは新E2Eを含めて検証する。

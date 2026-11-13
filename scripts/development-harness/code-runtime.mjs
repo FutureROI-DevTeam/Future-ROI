@@ -2,10 +2,10 @@ import { mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { command, stopAndConfirm } from './runtime.mjs';
-import { transaction, nextTask, reserve, finish, digest } from './state.mjs';
+import { transaction, nextTask, reserve, finish, digest, validateContract } from './state.mjs';
 import { generateProposal, processIdentity } from './codex-worker.mjs';
-import { api, pages, observeWork, verifyCandidate, accounted } from './github.mjs';
-import { codeFiles, isCode, validateCode } from './code-profile.mjs';
+import { api, pages, observeWork, verifyCandidate, accounted, remaining } from './github.mjs';
+import { codeFiles, isCode, validateCode, refreshCodeContract, verifyBaselineChanges } from './code-profile.mjs';
 import { parseCounts, countProblems } from '../../.github/scripts/ci-report.mjs';
 
 export const codeProbe = `const fs=require('node:fs');let denied=0;
@@ -64,6 +64,27 @@ export function collectScreenshots(inside, folder) {
     if (bytes.length > 500000 || bytes.toString('base64') !== encoded || bytes.subarray(0,8).toString('hex') !== '89504e470d0a1a0a') throw new Error('invalid-screenshot');
     writeFileSync(join(destination, `${width}.png`), bytes);
   }
+}
+export function refreshCodeBaseline(directory, batchId, next) {
+  validateContract(next);
+  const previous = transaction(directory,s=>s.batches[batchId]?.contract);
+  if(!previous || next.batchId!==batchId)throw new Error('baseline-refresh-not-authorized');
+  // Validate against a throwaway copy before any accounting/network mutation.
+  transaction(directory,s=>refreshCodeContract(structuredClone(s),batchId,next,digest(next)));
+  const id=previous.tasks[0].id;
+  return accounted(directory,id,30000,()=>{
+    const checkedCommand=(bin,args)=>command(bin,args,{timeout:remaining(15000)});
+    const main=api(`repos/${next.repository}/branches/main`);
+    if(main.commit.sha!==next.baseSha||!main.protected)throw new Error('baseline-or-protection-changed');
+    checkedCommand('git',['merge-base','--is-ancestor',previous.baseSha,next.baseSha]);
+    const paths=checkedCommand('git',['diff','--name-only',previous.baseSha,next.baseSha]).trim().split(/\r?\n/).filter(Boolean);
+    verifyBaselineChanges(paths,previous.baseSha,next.baseSha);
+    const image=JSON.parse(checkedCommand('docker',['image','inspect',next.validatorImage]))[0];
+    if(image.Id!==next.validatorImage||image.Config.Labels?.['future-roi-baseline']!==next.baseSha)throw new Error('validator-image-changed');
+    for(const spec of next.tasks)observeWork(spec,transaction(directory,s=>s.tasks[spec.id]),api,next.baseSha);
+    transaction(directory,s=>{remaining();if(s.batches[batchId].contract.baseSha!==previous.baseSha)throw new Error('baseline-refresh-race');refreshCodeContract(s,batchId,next,digest(next));});
+    return {state:'baseline-refreshed; counters-and-deadline-preserved',baseSha:next.baseSha};
+  });
 }
 
 export async function runCode(directory, batchId) {

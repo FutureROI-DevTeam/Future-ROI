@@ -3,7 +3,7 @@ import { initialize, transaction, enroll, nextTask, requestCancel, resumeCancell
 import { runOne, recover } from './runtime.mjs';
 import { runDocument } from './docs-runtime.mjs';
 import { publishDraft, observeCI } from './github.mjs';
-import { runCode } from './code-runtime.mjs';
+import { runCode, refreshCodeBaseline } from './code-runtime.mjs';
 import { isCode, recordCodeReview } from './code-profile.mjs';
 
 const [action, directory, target, input] = process.argv.slice(2);
@@ -24,6 +24,7 @@ try {
     case 'accept-fixture': transaction(directory, s => acceptFixture(s, target)); result = { state: 'local-fixture-accepted; no-issue-close' }; break;
     case 'acknowledge-review': transaction(directory, s => acknowledgeReview(s, target, json(input))); result = { state: 'artifact-review-acknowledged; no-issue-close' }; break;
     case 'record-code-review': transaction(directory, s => recordCodeReview(s, target, json(input))); result = { state: 'independent-code-review-recorded; not-human-approval' }; break;
+    case 'refresh-code-base': result = refreshCodeBaseline(directory, target, json(input)); break;
     case 'publish': result = publishDraft(directory, target); break;
     case 'ci': result = observeCI(directory, target); break;
     case 'prepare-issue': result = await runIssue(); if (result.state !== 'artifacts-ready') { process.exitCode = 1; } break;

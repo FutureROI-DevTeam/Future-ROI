@@ -3,11 +3,25 @@ import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { codeFiles, codeProfile, validateCode, validateCodeDiff, recordCodeReview } from './code-profile.mjs';
+import { codeFiles, codeProfile, validateCode, validateCodeDiff, recordCodeReview, refreshCodeContract, verifyBaselineChanges } from './code-profile.mjs';
 import { validateContract, emptyLedger, enroll, reserve, finish, nextTask, authorizeRepair, initialize, transaction } from './state.mjs';
 import { publishDraft, historicalBaselinePR } from './github.mjs';
 import { collectScreenshots } from './code-runtime.mjs';
 const head='a'.repeat(40);
+test('baseline refresh protects transitive test loaders and configs; only inspected SHA pair permits known unrelated tests',()=>{
+  const old='7beba614697ecc3098cde122e2f0305842962812',next='40ddc510919d85884160d512009abe4e345a1a8f';
+  verifyBaselineChanges(['docs/change-map.md','AGENTS.md','apps/web/tests/response-interception.mjs'],old,next);
+  for(const path of ['apps/web/tests/register-contracts.mjs','tsconfig.json','apps/web/tests/browser-debug-endpoint.mjs','apps/api/src/contracts/index.ts','.github/workflows/application.yml','package-lock.json'])assert.throws(()=>verifyBaselineChanges([path],old,next),/baseline-scope/);
+  assert.throws(()=>verifyBaselineChanges(['apps/web/tests/response-interception.mjs'],old,head),/baseline-scope/);
+});
+test('baseline refresh preserves failed attempts, cumulative time and deadline without scope or identity bypass',()=>{
+  const s=emptyLedger(),c=contract();enroll(s,c,1000);reserve(s,'issue-253','c',2000);finish(s,'issue-253',{container:'c',stopped:true,passed:false},3000);
+  const before=structuredClone(s),next={...c,baseSha:'b'.repeat(40),validatorImage:'sha256:'+'c'.repeat(64)};
+  refreshCodeContract(s,c.batchId,next,'new');
+  assert.deepEqual(s.tasks,before.tasks);for(const key of ['createdAt','expiresAt','reservedMs','modelRuns'])assert.equal(s.batches[c.batchId][key],before.batches[c.batchId][key]);
+  for(const change of [{taskMs:9999999},{tasks:[{...next.tasks[0],revision:2}]},{batchId:'bypass'}])assert.throws(()=>refreshCodeContract(s,c.batchId,{...next,...change},'bad'),/not-authorized/);
+  for(const change of [{head},{active:{container:'live'}},{writeIntent:{operation:'push'}},{pr:347},{cancelRequested:true}]){const bad=structuredClone(s);Object.assign(bad.tasks['issue-253'],change);assert.throws(()=>refreshCodeContract(bad,c.batchId,next,'bad'),/not-authorized/);}
+});
 test('screenshot export has fixed paths and rejects forged success, malformed data and unbounded output',()=>{
   const dir=mkdtempSync(join(tmpdir(),'roi-png-'));
   try{

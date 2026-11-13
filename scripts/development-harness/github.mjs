@@ -62,7 +62,7 @@ export function classifyWork(spec, task, refs, prs, localRefs = []) {
   return { pr: relevant[0] ?? null, remote: refs.find(r => r.branch === spec.branch) ?? null };
 }
 export function historicalBaselinePR(pr, spec, base, ancestor = (sha, baseline) => {
-  try { command('git', ['merge-base', '--is-ancestor', sha, baseline]); return true; } catch { return false; }
+  try { command('git', ['merge-base', '--is-ancestor', sha, baseline], { timeout: remaining(15000) }); return true; } catch { return false; }
 }) {
   const ownBranch = new RegExp(`(?:^|[/_-])${spec.issue}(?:$|[/_-])`).test(pr.head?.ref ?? '');
   return !!base && pr.state === 'closed' && !!pr.merged_at && /^[a-f0-9]{40}$/.test(pr.merge_commit_sha ?? '') &&
@@ -79,7 +79,7 @@ export function observeWork(spec, task, read = api, base) {
     pr.scopeOverlap = pages(`pulls/${pr.number}/files`, null, read).some(f => [f.filename, f.previous_filename].filter(Boolean).some(path =>
       spec.allowedFiles.includes(path) || issueDocument.test(path)));
   }
-  const local = command('git', ['for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/heads']).trim().split(/\r?\n/).filter(Boolean)
+  const local = command('git', ['for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/heads'], { timeout: remaining(15000) }).trim().split(/\r?\n/).filter(Boolean)
     .map(line => { const [branch, sha] = line.split(' '); return { branch, sha }; });
   return classifyWork(spec, task, branches, prs, local);
 }

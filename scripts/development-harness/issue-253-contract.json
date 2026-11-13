@@ -15,8 +15,8 @@
   "maxCostCents": 0,
   "auth": "existing-chatgpt-no-credits",
   "maxModelRuns": 4,
-  "baseSha": "7beba614697ecc3098cde122e2f0305842962812",
-  "validatorImage": "sha256:ff11e55a3743935caba4cb3c703b7b6977757841ea552b23133cb0096c72fc33",
+  "baseSha": "40ddc510919d85884160d512009abe4e345a1a8f",
+  "validatorImage": "sha256:bd6f23ce821ae72f728e1a035d909b7b69f059c2faadd29cfa9d9e3714ab5167",
   "tasks": [{
     "id": "issue-253",
     "issue": 253,

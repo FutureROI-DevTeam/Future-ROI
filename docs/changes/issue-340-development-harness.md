@@ -191,3 +191,9 @@ mainは現在active rulesetsで保護され、既存GitHub認証にpush権限が
 初回Foundationは追記末尾の空行で失敗し、空行修正後に125 text/2904 links成功。受入条件の弱化や検査削除では解消していない。
 
 実Codex attempt1は入力7060/output842 token、追加creditsなし。対象2 TSXの3つのformat optionsだけを生成し、ci-report6/実Chromium1/保存・試算10/既存ブラウザ1、型/build成功。CR-07によりrun全体は失敗でheadなし。予約390,000ms・実143,936ms、過去の2回の照合を含めて台帳に保持し、失敗を削除/初期化しない。
+
+再実行直前に別作業の#345/#342がmainへ統合され、基準が40ddc510919d85884160d512009abe4e345a1a8fへ進んだため生成前で停止した。このタスクからmain mergeは行っていない。対象2TSX・context・必須workflowは不変、変化は既存E2E終了競合と文書。新imageを固定mainから構築し、未公開/headなしに限定した基準更新を追加。予算・attempt・model回数・期限・receiptを保持する7件のcode回帰を確認し、別batchやrevision変更で迂回しない。追加preflight後の予約420,000msも引き継ぐ。
+
+独立診断BR-01（Blocking、基準更新の実装途中）: 個別の検査path列挙ではregister-contracts.mjsとbrowser-debug-endpoint.mjsを保護できず、将来のloader弱化を見落とす。今回のmainで弱化された事実はない。root tsconfigのextends仮説はWeb設定にextendsがなく棄却した。最小修正として全code/config変更を拒否し、精査済みSHAペアの上記3pathだけ例外にした。loader/契約/config/別SHAを拒否する回帰を追加し、隣接20/20成功。基準更新内のgit/dockerにも共通remaining timeoutを適用し、最終更新直前に期限を再確認する。
+
+作業branchへmainを通常mergeする操作は、自動承認レビューが今回のmerge禁止に反するとして拒否した。mergeは未実行、再試行もしていない。controller branchの履歴は保持し、候補の固定baseとimageだけを最新mainへ更新する経路に限定した。
