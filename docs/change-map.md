@@ -1,5 +1,15 @@
 # 仕様・実装・確認方法の対応表
 
+## 有限開発ハーネスの比較（#340）
+
+#253の限定コード修正は[契約](../scripts/development-harness/issue-253-contract.json) → [2ファイルの許可範囲](../scripts/development-harness/code-profile.mjs) → [隔離コード検査](../scripts/development-harness/code-runtime.mjs) → [実Chromium期待値](../scripts/development-harness/code-browser-check.mjs)へ追跡する。対象は[SaveFeedback/SaveDelta](../apps/web/src/features/logs/SaveFeedback.tsx)と[未保存試算](../apps/web/src/features/today/DraftProgressPreview.tsx)。ordinary workerは検査を編集できず、検査追加はハーネスPR、候補の製品2ファイルは別PRである。
+
+実Issueの限定profileは[文書生成・隔離検査](../scripts/development-harness/docs-runtime.mjs)、[branch/PR・publisher・CI照合](../scripts/development-harness/github.mjs)、[#331契約](../scripts/development-harness/issue-331-contract.json)、[負の回帰](../scripts/development-harness/docs.test.mjs)へ追跡する。文書の比較結果を製品採択・Issue完了にしない。
+
+実Codex接続は[生成・認証・復旧](../scripts/development-harness/codex-worker.mjs)と[固定CLI protocol](../scripts/development-harness/codex-client.mjs)、[契約例](../scripts/development-harness/codex-contract.json)へ追跡する。[portable回帰](../scripts/development-harness/codex.test.mjs)と[Windows実CLIの偽認証回帰](../scripts/development-harness/codex-runtime.test.mjs)を実モデル接続結果と区別する。
+
+[Architecture D-36](architecture.md#d-36-有限開発ハーネスのローカル比較340) → [契約・運用](operations/development-harness.md) → [状態と台帳](../scripts/development-harness/state.mjs)・[Docker実行](../scripts/development-harness/runtime.mjs)・[CLI](../scripts/development-harness/cli.mjs)へ追跡する。[状態回帰](../scripts/development-harness/state.test.mjs)は重複・取消・累積予算・レビュー固定・CI出所を、[実Docker回帰](../scripts/development-harness/runtime.test.mjs)は書込み拒否・偽成功・停止復旧を検査する。fixture成功を実Issueの受入・実認証PR→CI・AW採択に昇格させない。
+
 現行ProductはFuture ROI。要件は[Product Spec](product-spec.md)、実現方式は[Architecture](architecture.md)が正本。この対応表は実装を調べる入口で、正式仕様の追加正本ではない。下表のパスと[基本構成の採用・次作業・残条件](architecture.md#2026-10-03の技術構成合意)は[Repository構成](architecture.md#repository構成)から確認する。旧音楽案の対応表は[履歴](https://github.com/jogi-hack-2026-team/jogi-hack-2026/blob/77c71a5f248a4dce4ce9fb8af6619b41541be9d8/archive/music-exploration/docs/change-map.md)へ保管した。
 
 運用と配置は[共通の文書規則](../CONTRIBUTING.md#変更に伴う文書更新)、草稿・実施結果の保存先は[履歴フォルダ](changes/)を参照する。新しい実測だけを追加する場合は中央表への毎回追記を要しない。現行の契約・処理経路・確認方法が変わる場合は該当行を更新する。

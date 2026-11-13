@@ -712,6 +712,18 @@ resetは同ユーザーの初回にも効くtransaction advisory lock→認証us
 | D-30 | 2026-10-10 | 依頼者判断（Code Freeze前のため文書のチーム事前承諾なし。コードはHuman Review対象） | [Todayの同一owner再確認で入力を保つ](#d-30-todayの同一owner再確認で入力を保つ190)。D-29・#155の別owner・失敗時の境界は維持 |
 | D-31 | 2026-10-10 | DECIDED（Kaito-Iwaseの明示判断、PR #204） | [同一モデルの完了CDF積分](#d-31-同一モデルの完了cdf統合候補203)を標準整数域の既定に採用。D-22の完了計算のみ置換し、範囲外・数値gate・明示`sampled`、公開DTO非追加を維持 |
 
+### D-36 有限開発ハーネスのローカル比較（#340）
+
+**状態：LIMITED TRIAL。** 2026-11-12の依頼はハーネス実装・隔離fixture・独立レビューまでを許可する。AW採択、実Issueの無人運用、権限・課金追加、merge・本番配備の採択ではない。
+
+既存Codex＋Skillsが準備する差分を、有限契約・host台帳・Docker隔離検証・Draft用成果物へつなぐ小さい入口を比較する。続行の明示依頼で、固定CLI 0.151.0の実Codex差分生成を同じ経路へ接続する。認証を持つ生成processはツールを公開せず、既存access tokenだけの専用ホームを使う。候補の実行は認証なしDockerで、policy・検査入口・最終結果はread-only。目的は誤完了・重複・復旧・レビュー負担を抑えた実行経路の検証で、製品仕様を変更しない。
+
+2026-11-13の明示続行依頼で、実Issueの新規比較文書1ファイルに限定したprofileとbranch/全状態PR照合、Draft publisher、CI照合まで拡張する。採択・製品コード変更・Issue Closeは対象外。代替のAW v1.2.2は購読認証非対応で、新しいAPI/Copilot認証を要するため見送り。main保護はactive rulesetsを確認済み。旧ML runnerの復活や独自scheduler/DB/native queueは追加しない。人の時間・総費用の削減は未実証。境界を満たせない場合は実接続を止め、設定コストが削減分を超える場合は縮小する。
+
+契約・不変条件・起動/停止/復旧・再検討条件は[運用手順](operations/development-harness.md)、比較根拠・試験と独立レビューは[検証記録](changes/issue-340-development-harness.md)に残す。
+
+2026-11-13の追加依頼で、#253指摘2の整数部表示修正を限定採択し、対象2 TSXだけを生成するcode profileへ拡張する。既存source生成・台帳・publisherを再利用し、固定main/lockの検査imageと別ChromiumでのDOM検査を採用する。任意コードprofile、候補による検査変更、無人レビューは採用しない。code profileのDraft発行には対象headの独立レビュー記録を要求し、人間のApproveと区別する。限定修正の採択は製品仕様全体の再検討や他Issueの実装許可ではない。
+
 ### D-31 同一モデルの完了CDF統合候補（#203）
 
 2026-10-10 / **DECIDED（Kaito-Iwaseの明示判断）** / [PR #204](https://github.com/jogi-hack-2026-team/jogi-hack-2026/pull/204)の計算方式を採用する。見出しは候補実装時の参照先として保持する。判断の出所はKaito-Iwaseであり、チーム全員の合意・Human APPROVED review・mainへのMerge・公開配置・実ユーザー検証を済みとする記録ではない。

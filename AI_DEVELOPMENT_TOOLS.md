@@ -23,6 +23,10 @@ Issue #47の[ML Agent Harness](https://github.com/jogi-hack-2026-team/jogi-hack-
 
 ## 利用前の確認
 
+### #340の有限比較試行
+
+2026-11-12〜13の明示依頼に限り、既存Codex＋Skillsの手順と固定CLI 0.151.0の差分生成を[開発ハーネス](docs/operations/development-harness.md)へ接続する。無害なfixtureに加え、明示契約の実Issueの新規比較文書1ファイルを隔離検証・Draft・CI照合まで扱う。既存GitHub CLI認証をpublisherで使用するが、候補へ渡さない。任意製品コードの自律実行・AWの正式採択・merge/Closeではない。固定した権限境界と予算を先に検証し、未知の費用や未実行CIを成功扱いにしない。技術比較の範囲は[Architecture D-36](docs/architecture.md#d-36-有限開発ハーネスのローカル比較340)、結果は[#340検証記録](docs/changes/issue-340-development-harness.md)を参照する。
+
 - GitHub MCP：利用前にツールの公開、認証、対象リポジトリとProjectへの権限を確認する。未接続・権限不足は未確認として扱う。
 - ブラウザ検証：既存の[Chrome/CDP回帰と実API・隔離DBの継続E2E](docs/DEVELOPMENT_GUIDE.md#検証)を優先する。これはPlaywrightの導入確認とは別。Playwright CLI＋Skillが必要な場合は、その環境での検出・本文・依存ツールを確認する。
 - [documentation-sync](.agents/skills/documentation-sync/SKILL.md)：既存Skillを確認済み。今回の正式採択を記録し、変更に関係する正本への影響だけを確認する。

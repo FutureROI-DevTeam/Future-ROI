@@ -84,6 +84,8 @@ API テストはテスト用 PostgreSQL を使用します。shell の `DATABASE
 
 ### 開発基盤のセットアップと確認
 
+許可済み有限作業の入口は[開発ハーネス](docs/operations/development-harness.md)を参照してください。固定Codex CLIの差分生成を、明示した実Issueの新規比較文書1ファイル・隔離検証・Draft発行・CI照合へ接続しています。任意製品コードの変更、採択、自動merge・Closeは行いません。
+
 文書・リンクと図の検査は PowerShell 7 で実行できます。
 
 ```powershell
