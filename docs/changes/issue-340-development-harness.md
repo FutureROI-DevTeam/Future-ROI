@@ -197,3 +197,13 @@ mainは現在active rulesetsで保護され、既存GitHub認証にpush権限が
 独立診断BR-01（Blocking、基準更新の実装途中）: 個別の検査path列挙ではregister-contracts.mjsとbrowser-debug-endpoint.mjsを保護できず、将来のloader弱化を見落とす。今回のmainで弱化された事実はない。root tsconfigのextends仮説はWeb設定にextendsがなく棄却した。最小修正として全code/config変更を拒否し、精査済みSHAペアの上記3pathだけ例外にした。loader/契約/config/別SHAを拒否する回帰を追加し、隣接20/20成功。基準更新内のgit/dockerにも共通remaining timeoutを適用し、最終更新直前に期限を再確認する。
 
 作業branchへmainを通常mergeする操作は、自動承認レビューが今回のmerge禁止に反するとして拒否した。mergeは未実行、再試行もしていない。controller branchの履歴は保持し、候補の固定baseとimageだけを最新mainへ更新する経路に限定した。
+
+## #253の実コード生成・再検証
+
+e180a42のoperatorで基準更新を実接続し、旧fingerprint・旧base/imageのevent、attempt1・modelRuns1・期限・失敗receiptを保持した。新imageの構築stepは約285秒。独立reviewerはBR-01の拒否境界8/8と実main差分を再確認し、未解決Blockingなし。
+
+同じ台帳のattempt2でCodexが新main40ddc510から候補 `1094fc65a2f95c19c6f6213be8eb019db3180fc3` を生成。差分はSaveFeedback.tsx/DraftProgressPreview.tsxのformat options 3箇所だけ（3追加/3削除）。ci-report6、実Chromium1（正負・大整数・微小値・999.9・null/0・ARIA・compact・390/1440px）、既存保存/試算10、既存ブラウザ1、型/buildすべて成功、skip0。readonly7拒否、秘密・host Git/socket不在、画像2枚のhost保存、worker停止後のcandidate commitまで成功した。実画面は部品を固定入力で描画したもので、実利用者・screen reader・本番確認ではない。
+
+attempt2の入力7105/output842、2attempt合計input14165/output1684。この時点のtask予約780,000ms・実285,987ms、追加creditsなし、総費用と人の時間はnull。初回の検査成功と成果物保存失敗、main更新による生成前停止を履歴に残す。台帳はartifacts-ready、独立候補レビューとDraft後CIはこの記録時点では待ち。candidate headと結果は `.local/harness-340-codex-live/issue-253/2/` に保存する。
+
+ハーネスの静的・ローカル回帰はe180a42で42/42成功（state12/Codex4/docs12/code8/ci-report6、skip0）、Foundation125 text/2904 links成功。実コード候補の検査とは別集計である。
