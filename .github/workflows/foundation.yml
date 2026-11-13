@@ -31,7 +31,7 @@ jobs:
       - name: Check diagram synchronization regressions
         run: pwsh -NoProfile -File ./scripts/tests/check-document-diagrams.test.ps1
       - name: Check finite development harness contracts
-          run: node --test scripts/development-harness/state.test.mjs scripts/development-harness/codex.test.mjs scripts/development-harness/docs.test.mjs scripts/development-harness/code.test.mjs
+        run: node --test scripts/development-harness/state.test.mjs scripts/development-harness/codex.test.mjs scripts/development-harness/docs.test.mjs scripts/development-harness/code.test.mjs
       - name: Summarize verification
         if: ${{ always() }}
         run: node .github/scripts/ci-report.mjs summary foundation

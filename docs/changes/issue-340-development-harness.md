@@ -207,3 +207,7 @@ e180a42のoperatorで基準更新を実接続し、旧fingerprint・旧base/imag
 attempt2の入力7105/output842、2attempt合計input14165/output1684。この時点のtask予約780,000ms・実285,987ms、追加creditsなし、総費用と人の時間はnull。初回の検査成功と成果物保存失敗、main更新による生成前停止を履歴に残す。台帳はartifacts-ready、独立候補レビューとDraft後CIはこの記録時点では待ち。candidate headと結果は `.local/harness-340-codex-live/issue-253/2/` に保存する。
 
 ハーネスの静的・ローカル回帰はe180a42で42/42成功（state12/Codex4/docs12/code8/ci-report6、skip0）、Foundation125 text/2904 links成功。実コード候補の検査とは別集計である。
+
+候補1094fc65は独立reviewerが実Git差分・proposal・mount対象・policy digest・全ログ・receiptを照合しBlockingなし。publisherがDraft #347を作成し、同headの必須CI4件（Application43372578453 / Foundation43372578428、attempt1）が成功。台帳のci観測で発行元・必須step・実checkoutを照合してreview-readyへ遷移した。headは固定し、#253指摘1/3/4/5、Issue Close、人の受入を残す。初回のCR-07保存失敗から今回の成果物取得・commit・Draft・CIまで通り、全経路も再確認済み。
+
+CR-08（Blocking、ba0dd9e `.github/workflows/foundation.yml`）: ハーネス検査stepのrunインデントが深く、Foundationが起動しなかった。Application3件は成功したが必須4件照合はpassed:falseとなり、CI完了を拒否した。既存の文書Foundation検査はYAML構文を検査しないため、ローカル成功だけでは発見できなかった。runのインデント1行のみ修正し、独立reviewerが既存PyYAML6.0.2で旧版ScannerError/修正版受理と正しいstep所属を確認した。隣接42/42とFoundation125 text/2904 linksも成功。新headの実4CIは再確認待ち。合否条件や必須checkは変更しない。最終headと実CI証拠はPR #344 / Issue #340の開発情報に記録する。
