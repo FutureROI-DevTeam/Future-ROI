@@ -716,7 +716,7 @@ resetは同ユーザーの初回にも効くtransaction advisory lock→認証us
 
 既存Codex＋Skillsが準備する差分を、有限契約・host台帳・Docker隔離検証・Draft用成果物へつなぐ小さい入口を比較する。続行の明示依頼で、固定CLI 0.151.0の実Codex差分生成を同じ経路へ接続する。認証を持つ生成processはツールを公開せず、既存access tokenだけの専用ホームを使う。候補の実行は認証なしDockerで、policy・検査入口・最終結果はread-only。目的は誤完了・重複・復旧・レビュー負担を抑えた実行経路の検証で、製品仕様を変更しない。
 
-代替のAW＋Codexは、固定版の認証と利用枠・生成lockの検証条件が揃わず見送り。旧ML runnerの復活や独自scheduler/DB/汎用publisherは必要な最小経路を超えるため追加しない。現在はfixture専用という制約があり、人の時間・総費用の削減も未実証。境界を満たせない場合は実接続を止め、設定コストが削減分を超える場合は縮小する。
+2026-11-13の明示続行依頼で、実Issueの新規比較文書1ファイルに限定したprofileとbranch/全状態PR照合、Draft publisher、CI照合まで拡張する。採択・製品コード変更・Issue Closeは対象外。代替のAW v1.2.2は購読認証非対応で、新しいAPI/Copilot認証を要するため見送り。main保護はactive rulesetsを確認済み。旧ML runnerの復活や独自scheduler/DB/native queueは追加しない。人の時間・総費用の削減は未実証。境界を満たせない場合は実接続を止め、設定コストが削減分を超える場合は縮小する。
 
 契約・不変条件・起動/停止/復旧・再検討条件は[運用手順](operations/development-harness.md)、比較根拠・試験と独立レビューは[検証記録](changes/issue-340-development-harness.md)に残す。
 

@@ -2,6 +2,8 @@
 
 ## 有限開発ハーネスの比較（#340）
 
+実Issueの限定profileは[文書生成・隔離検査](../scripts/development-harness/docs-runtime.mjs)、[branch/PR・publisher・CI照合](../scripts/development-harness/github.mjs)、[#331契約](../scripts/development-harness/issue-331-contract.json)、[負の回帰](../scripts/development-harness/docs.test.mjs)へ追跡する。文書の比較結果を製品採択・Issue完了にしない。
+
 実Codex接続は[生成・認証・復旧](../scripts/development-harness/codex-worker.mjs)と[固定CLI protocol](../scripts/development-harness/codex-client.mjs)、[契約例](../scripts/development-harness/codex-contract.json)へ追跡する。[portable回帰](../scripts/development-harness/codex.test.mjs)と[Windows実CLIの偽認証回帰](../scripts/development-harness/codex-runtime.test.mjs)を実モデル接続結果と区別する。
 
 [Architecture D-36](architecture.md#d-36-有限開発ハーネスのローカル比較340) → [契約・運用](operations/development-harness.md) → [状態と台帳](../scripts/development-harness/state.mjs)・[Docker実行](../scripts/development-harness/runtime.mjs)・[CLI](../scripts/development-harness/cli.mjs)へ追跡する。[状態回帰](../scripts/development-harness/state.test.mjs)は重複・取消・累積予算・レビュー固定・CI出所を、[実Docker回帰](../scripts/development-harness/runtime.test.mjs)は書込み拒否・偽成功・停止復旧を検査する。fixture成功を実Issueの受入・実認証PR→CI・AW採択に昇格させない。

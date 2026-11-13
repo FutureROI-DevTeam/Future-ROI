@@ -1,6 +1,34 @@
 # 有限batchの開発ハーネス
 
-[#340](https://github.com/FutureROI-DevTeam/Future-ROI/issues/340)の有限実行入口。既存Codex CLIに実装差分を生成させ、固定契約に沿って隔離検証し、候補commit・patch・Draft本文を保存する。最初の対象は同Issueの無害な整数加算fixture。実backlogの製品Issueを実装・完了したとは扱わない。任意Issueへの汎用実行、自動push/PR/merge/Closeは無効。
+[#340](https://github.com/FutureROI-DevTeam/Future-ROI/issues/340)の有限実行入口。既存Codex CLIに差分を生成させ、固定契約に沿って隔離検証し、候補commitを保存する。実Issue向けの `repository-docs-v1` は、許可された新しい比較文書1ファイルを専用branchへpushし、Draftと必須CIの照合まで進める。製品仕様の採択・任意コード変更・自動merge・Issue Closeは行わない。整数加算fixtureも比較用として残す。
+
+## 実Issueの起動・発行・CI照合
+
+対象は[契約例 #331](../../scripts/development-harness/issue-331-contract.json)。`docs/changes/issue-N-*.md` の明示した新規1ファイルだけを許可する。契約の目的・受入・除外・contextFilesはtrusted operatorが確定し、Issue本文・最新コメントは資料として渡す。固定mainのsourceとlockの指定版抽出からCodexが文書を作り、同じmainのFoundationとci-report回帰をread-only snapshotで検査する。生成文書の意味と採択は人のレビュー対象。
+
+```powershell
+# イメージ構築はtrusted側で一度。candidateやcredentialをbuild contextへCOPYしない。
+docker build -f scripts/development-harness/docs-validator.Dockerfile -t roi-docs-validator:local .
+docker image inspect roi-docs-validator:local --format '{{.Id}}'
+# 構築した固定IDを契約へ設定してレビュー後にenroll。登録済み契約は書き換えない。
+$stateDir = '.local/harness-340-codex-live'
+# 既存台帳がある場合initはしない。旧fixtureの予算・証拠も保持する。
+node scripts/development-harness/cli.mjs enroll $stateDir scripts/development-harness/issue-331-contract.json
+node scripts/development-harness/cli.mjs run-issues $stateDir issue-docs-331-v1
+# 分割実行: prepare-issue STATE BATCH → publish STATE ID → ci STATE ID
+node scripts/development-harness/cli.mjs ci $stateDir issue-331
+node scripts/development-harness/cli.mjs status $stateDir
+```
+
+既存Codex購読とGitHub `gh` keyring認証を使用する。MCPによる作業管理を優先し、固定publisherは再利用可能な既存CLIで実装する。ghの認証やモデル認証を候補Dockerへ渡さない。Docker image IDはローカルbuildの成果物なので、別端末の新しいIDを無検証で置換しない。対象main SHAが変わった場合も自動追随せず再検証を要求する。
+
+初期値はworker1、レビュー待ち1、初回＋修復3回、モデル起動予約4回。attempt300秒、task/batch1800秒、登録から24時間、新規課金上限0。publisher全体は120秒、preflightとCI観測は各30秒を前払いし、全APIページに共通deadlineを伝播する。実経過と超過も記録し、失敗・応答喪失・再起動・head更新で返却しない。期限後も未知書込みの照合だけは許可して消費を記録し、新規書込みは止める。観測を繰り返して予算が尽きた場合は条件を緩めない。
+
+同じrepo＋Issue IDを別revision/batchで再登録できない。開始前にlocal/remote branchと全状態PRをページ終端まで読む。既存の他作業・closed PR・異なるhead・複数PRは停止する。各push/POST前にUUIDつきintentを保存し、結果を別GETで確かめる。応答不明なら `publish` は照合から再開し、不在を再送許可にしない。取消中も照合だけ行える。競合したintentはCASで拒否する。
+
+`artifacts-ready → write-unknown → draft-created → ci-wait → review-ready` を区別する。GitHub Actions発行元15368、固定workflow、必須jobとstep、最新run/attempt、jobログの実checkoutとCI_SOURCE_SHAを照合する。現在のmerge checkoutと違う古い成功やskipは合格にしない。失敗診断artifactの条件付きskipだけを許容する。docs-onlyの #331 ではQuestion prior UI candidate workflowは起動しないため、その依存分離・再現検証を合格に数えない。
+
+取消は `cancel STATE issue-331`、worker復旧は `recover`、終了確認後の取消解除は `resume`。不明書込みは `publish` で照合する。必須修正は後述の `repair` に対象headと根拠を渡し、同じbatchを再実行する。修正候補は旧headを親に持ち、同じDraft branchへfast-forwardする。Optionalでレビュー待ちheadを動かさない。レビュー枠が埋まれば次のIssueを増やさず正常終了する。
 
 ## 実Codex workerの起動
 
@@ -23,13 +51,13 @@ Codex modeはattempt 300秒、task/batch 1200秒、登録から1時間、モデ�
 
 停止は `cancel $stateDir fixture-issue-340`、復旧は `recover $stateDir fixture-issue-340`。復旧はsupervisorを終了確認し、最新台帳の子processをPID/開始時刻/pathで照合して停止する。PID登録前の応答喪失は停止不明として保持する。停止後 `resume`、同じ `run-codex` で再開する。上限/有効期限はリセットしない。必須修正の `repair` と計測の `measure` は下記と共通。
 
-`model-input-digest.json` は入力digest/基準SHA、`model-result.json` はCLI実体・catalog・拒否probe・token利用・利用枠を保存する。raw transcript/token実値は保存しない。`results/result.json` とpatch/Draftは従来と共通。実認証でのPR→CI確認は未接続。
+`model-input-digest.json` は入力digest/基準SHA、`model-result.json` はCLI実体・catalog・拒否probe・token利用・利用枠を保存する。raw transcript/token実値は保存しない。`results/result.json` とpatchは共通。実接続結果は[検証記録](../changes/issue-340-development-harness.md)を参照する。
 
 ## 実行契約と状態
 
-[契約例](../../scripts/development-harness/example-contract.json)には目的、有限対象、操作、受入、除外、依存、予算を含める。Issue・PR・ログ・Notionは資料であり権限入力ではない。Ready/Openを実行許可としない。`fixture-*` IDを台帳全体の固定キーとし、revisionやbatch変更で再登録できない。実Issue profileは未実装で、既存branch/PRの実照合が整うまで有効化しない。
+[fixture契約例](../../scripts/development-harness/example-contract.json)にも目的、有限対象、操作、受入、除外、依存、予算を含める。Issue・PR・ログ・Notionは資料であり権限入力ではない。Ready/Openを実行許可としない。`fixture-*` と `issue-N` は台帳全体の固定キーであり、revisionやbatch変更で再登録できない。
 
-`eligible → implementing → artifacts-ready` が現在の実行経路。失敗・取消は `awaiting-decision`。`draft-created / ci-wait / review-ready / write-unknown` の照合関数は負の回帰用であり、実GitHub接続済みではない。成果物生成をCI完了・Issue完了へ昇格させない。
+fixtureは `eligible → implementing → artifacts-ready` まで。失敗・取消は `awaiting-decision`。実Issue経路は上記のpublisher/CI状態まで進むが、成果物生成やCI成功を製品Issue完了へ昇格させない。
 
 初期値はworker 1、レビュー待ち1、初回＋修復3回。1 attemptは60秒を前払い予約し、うち15秒を終了・照合に残す。taskは240秒、例のbatchは480秒、batchの有効期間は登録から1時間。時間予約は失敗・再起動・担当交替・head更新でも返却しない。期限切れや上限時は次の実行を止め、終了・照合だけを行う。Docker停止/API自体の障害では時間内停止を保証せず、active枠を保持する。
 
@@ -93,16 +121,16 @@ npm run verify:ci-reports
 npm run verify:foundation
 ```
 
-Docker回帰はruntime欠落時にskipせず失敗する。ApplicationにDocker回帰、Foundationに状態回帰を接続する。PRを必要とする既存CIとローカル試験は別。実GitHubの検査発行元・run/attempt・head/merge checkout照合は未接続。
+Docker回帰はruntime欠落時にskipせず失敗する。ApplicationにDocker回帰、Foundationに状態・Codex・docs/publisher回帰を接続する。PRを必要とする既存CIとローカル試験は別。実PR→CIの証拠は台帳のciと検証記録へ残す。
 
 ## 実接続へ進む前の設定差分
 
 | 項目 | 現在 | 次の判断と必要理由 |
 | --- | --- | --- |
 | AW/モデル | 固定Codex 0.151.0＋既存購読の構造化source生成、AW未導入 | 別OS/CLI/AWやAPI認証は別適合検証。App/Secret作成は別承認 |
-| main/発行 | main保護未確認ではなく取得時false、publisherなし | direct push・bypass・必須check省略をGitHub側で拒否する具体設定と権限を別途承認・検証 |
-| 実作業profile | fixtureのみ | 対象Issueの契約、既存branch/PR/未確定操作照合、変更に応じた固定検査を追加レビュー |
-| CI | 状態照合のローカル回帰のみ | 実認証Draft→CI開始・承認待ち→出所と最新attemptの取得を通す |
+| main/発行 | active rulesets・必須4check、既存push認証を2026-11-13に確認 | この実装のための保護変更は不要。別repoへの一般化はしない |
+| 実作業profile | 明示された新規比較文書1ファイル | 任意製品コードには別の許可範囲・固定検査・独立レビューが必要 |
+| AW | v1.2.2はChatGPT購読認証非対応、Actions secretsなし | AWを選ぶ場合のみAPIキーまたはCopilot権限と固定版lock検証が必要。今回は設定しない |
 | 費用・人の負担 | 未計測はnull | 失敗・人の引取りも含めて計測。少数fixtureの成功で削減効果を主張しない |
 
 詳細な[実装・検証記録](../changes/issue-340-development-harness.md)を参照する。

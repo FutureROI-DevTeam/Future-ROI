@@ -12,17 +12,36 @@ export const reviewStates = ['artifacts-ready', 'draft-created', 'ci-wait', 'rev
 // not instructions from an issue, candidate, log, or arbitrary command in JSON.
 export function validateContract(c) {
   insist(c?.version === 1 && c.repository === repository && /^[a-z0-9-]{1,48}$/.test(c.batchId), 'invalid-contract');
-  insist(['local-fixture', 'codex-fixture'].includes(c.mode) && c.publish === false, 'live-execution-disabled');
+  const docs = c.mode === 'codex-issue-docs';
+  insist(['local-fixture', 'codex-fixture', 'codex-issue-docs'].includes(c.mode) && (docs ? c.publish === true : c.publish === false), 'live-execution-disabled');
   insist(c.workers === 1 && c.reviewLimit === 1 && c.maxRepairs === 3, 'unsupported-capacity');
-  insist(positive(c.attemptMs) && c.attemptMs > 15000 && c.attemptMs <= (c.mode === 'codex-fixture' ? 300000 : 60000) && positive(c.batchMs) && positive(c.taskMs), 'invalid-time-budget');
+  insist(positive(c.attemptMs) && c.attemptMs > 15000 && c.attemptMs <= (c.mode.startsWith('codex-') ? 300000 : 60000) && positive(c.batchMs) && positive(c.taskMs), 'invalid-time-budget');
   insist(positive(c.lifetimeMs) && c.lifetimeMs <= 86400000, 'invalid-lifetime');
   insist(c.maxCostCents === 0, 'billable-execution-disabled');
   if (c.mode === 'codex-fixture') {
     insist(c.auth === 'existing-chatgpt-no-credits' && c.maxModelRuns === 4 && c.issue === 340, 'unsupported-model-contract');
   }
+  if (docs) {
+    insist(c.auth === 'existing-chatgpt-no-credits' && c.maxModelRuns === 4, 'unsupported-model-contract');
+    insist(/^[a-f0-9]{40}$/.test(c.baseSha) && /^sha256:[a-f0-9]{64}$/.test(c.validatorImage), 'pinned-baseline-required');
+    insist(positive(c.publishMs) && c.publishMs <= 300000, 'invalid-publish-budget');
+  }
   insist(Array.isArray(c.tasks) && c.tasks.length > 0 && c.tasks.length <= 10, 'finite-batch-required');
   const ids = new Set();
   for (const t of c.tasks) {
+    if (docs) {
+      insist(positive(t.issue) && t.id === `issue-${t.issue}` && !ids.has(t.id), 'invalid-or-duplicate-task');
+      ids.add(t.id);
+      insist(t.revision === 1 && t.profile === 'repository-docs-v1', 'unsupported-revision-or-profile');
+      insist(typeof t.purpose === 'string' && t.purpose.length > 0 && t.purpose.length <= 300 && typeof t.acceptance === 'string' && t.acceptance.length > 0, 'purpose-required');
+      insist(t.allowedFiles?.length === 1 && new RegExp(`^docs/changes/issue-${t.issue}-[a-z0-9-]+\\.md$`).test(t.allowedFiles[0]), 'forbidden-scope');
+      insist(t.branch === `docs/${t.issue}-harness`, 'stable-branch-required');
+      insist(Array.isArray(t.contextFiles) && t.contextFiles.length > 0 && t.contextFiles.length <= 30 && t.contextFiles.every(p => typeof p === 'string' && /^[a-zA-Z0-9_./-]+$/.test(p) && !p.split('/').includes('..') && !/(^|\/)(\.env|\.git\/|auth\.json|\.secrets)/.test(p)), 'invalid-context');
+      insist(JSON.stringify(t.operations) === JSON.stringify(['generate-document', 'verify', 'push-branch', 'create-draft', 'observe-ci']), 'forbidden-operation');
+      insist(t.exclusions === 'product,ci,harness,policy,auth,tests,dependencies,adoption,issue-close,merge,deploy', 'exclusions-required');
+      insist(Array.isArray(t.dependencies) && t.dependencies.every(id => ids.has(id) && id !== t.id), 'dependency-order-or-cycle');
+      continue;
+    }
     insist(/^fixture-[a-z0-9-]{1,32}$/.test(t.id) && !ids.has(t.id), 'invalid-or-duplicate-task');
     if (c.mode === 'codex-fixture') { insist(t.id === 'fixture-issue-340', 'issue-identity-required'); }
     ids.add(t.id);
@@ -65,7 +84,8 @@ export function nextTask(s, batchId, now = Date.now()) {
   const b = s.batches[batchId];
   insist(b, 'unknown-batch');
   if (Object.values(s.tasks).some(t => t.active)) { return { reason: 'worker-stop-unconfirmed' }; }
-  if (b.contract.mode === 'codex-fixture' && b.modelRuns >= b.contract.maxModelRuns) { return { reason: 'model-run-budget' }; }
+  if (Object.values(s.tasks).some(t => t.writeIntent)) { return { reason: 'write-still-unknown' }; }
+  if (b.contract.mode.startsWith('codex-') && b.modelRuns >= b.contract.maxModelRuns) { return { reason: 'model-run-budget' }; }
   if (now + b.contract.attemptMs > b.expiresAt) { return { reason: 'lifetime-budget' }; }
   for (const spec of b.contract.tasks) {
     const t = s.tasks[spec.id];
@@ -87,7 +107,7 @@ export function reserve(s, id, container, now = Date.now()) {
   t.attempts += 1;
   t.reservedMs += b.contract.attemptMs;
   b.reservedMs += b.contract.attemptMs;
-  if (b.contract.mode === 'codex-fixture') { b.modelRuns += 1; }
+  if (b.contract.mode.startsWith('codex-')) { b.modelRuns += 1; }
   t.active = { container, startedAt: now, attempt: t.attempts };
   t.state = 'implementing';
   t.resumeReason = null;
@@ -187,9 +207,18 @@ export function assessCI(t, evidence, expected) {
 
 export function acceptFixture(s, id) {
   const t = s.tasks[id];
+  insist(t && s.batches[t.batchId].contract.mode.endsWith('fixture'), 'fixture-only');
   insist(t?.state === 'artifacts-ready' && !t.active && !t.writeIntent && !t.cancelRequested, 'artifact-not-reviewable');
   t.state = 'accepted';
   t.resumeReason = 'local-fixture-accepted; no-real-issue-closed';
+}
+
+export function acknowledgeReview(s, id, evidence) {
+  const t = s.tasks[id];
+  insist(t?.state === 'review-ready' && !t.active && !t.writeIntent && !t.cancelRequested, 'review-not-ready');
+  insist(evidence?.head === t.head && typeof evidence.reference === 'string' && evidence.reference.length > 0, 'review-evidence-required');
+  t.state = 'accepted'; t.review = evidence;
+  t.resumeReason = 'artifact-review-acknowledged; no-issue-close-or-product-adoption';
 }
 
 export function recordMetrics(s, values) {

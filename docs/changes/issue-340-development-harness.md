@@ -107,3 +107,15 @@ review-gateの対象はIssue #340、契約・権限・状態・固定検査・�
 - `model-result.json` 初版の `requests:2` は**fake tool-boundary probe**のHTTP件数であり、実推論要求数ではない。混同を防ぐため後続コードでは `toolBoundaryProbe` に分離し、`inferenceRequests:null` と明示する。元の実行証拠を改変しない。
 
 実認証モデル→生成source→隔離検証→候補commit/Draft成果物の経路は実測した。実モデルの初回は成功のため、修復・偽成功・中断の異常系は無害なfixture/偽認証/実process試験の証拠として分ける。publisher、PR→CI取得、任意Issueの自律選定/実装、実利用者受入、費用/人手削減は未検証のまま。Issue #340はOpen、main merge・配備・追加権限/Secrets・定期起動は行っていない。
+
+## 実Issue profileへの拡張計画（2026-11-13）
+
+固定main `7beba614697ecc3098cde122e2f0305842962812` から #331 の比較資料1ファイルを生成する。対象は `repository-docs-v1`、実装は `docs-runtime.mjs` と小さな `github.mjs` publisher。旧runnerの復活、scheduler、DB、queue、自動mergeは追加しない。採択や製品変更を行わない比較資料を選ぶ理由は、Issueの残る判断を具体化でき、履歴や依存を変更せず独立レビューできるため。
+
+mainは現在active rulesetsで保護され、既存GitHub認証にpush権限がある。AW v1.2.2の[固定版Codex仕様](https://github.com/github/gh-aw/blob/v1.2.2/docs/src/content/docs/reference/engines/codex.md)はChatGPT購読認証を非対応とする。Actions secretsは空で、新API/Copilot認証を追加しないため既存ローカルCodex経路を継続する。以前のmain未保護は当時の観測として残す。
+
+受入は、exact new fileの差分のみ、基準mainからの候補commit、実OS権限制御による検査/結果書込み拒否、全状態PR/branch照合、write-ahead外部操作、同じ台帳の累積時間/回数、必須CIのhead/checkout/producer/run/attempt/step照合。製品Issueの受入やCloseを自動化しない。Foundationのリンク解決はrepo外へ出得るため、秘密情報のないread-only Docker snapshot内だけで候補文書を検査する。
+
+事前失敗仮説: 旧Issue本文だけを読んで解消済みalertを再報告する、TypeScript供給元を親実験環境と誤記する、docs-only CIを依存分離の証拠にする、候補branchへハーネス差分が混ざる、応答喪失を再POSTする、古いmerge成功を流用する。固定source/lock抽出/最新コメント、差分制限、隔離検査、台帳CAS、実runログで反証する。モデルの比較文書は独立レビュー対象とする。
+
+途中独立診断IR-01〜04: 古いwrite-intent照合が新Draft intentを消す競合、取消後照合の行き止まり、CI checkout/必須step欠落、観測APIの共通期限欠落を確認。UUIDとCAS、取消中read-only照合、実checkout＋必須step、共通deadlineと観測予約/実測を追加した。無害な交錯・応答喪失・skip・古いSHA・遅いpaginationの回帰で再確認する。修正前はBlocking、最終状態は後続の検証記録を参照。
