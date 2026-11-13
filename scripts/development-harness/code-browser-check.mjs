@@ -13,6 +13,7 @@ const source = `import {createRoot} from 'react-dom/client';import {flushSync} f
 import {SaveDelta,SaveFeedback} from '../src/features/logs/SaveFeedback.tsx';
 import {DraftProgressPreview} from '../src/features/today/DraftProgressPreview.tsx';
 import '../src/styles.css';
+import '../src/ui/tokens.css';import '../src/ui/page.css';import '../src/features/today/today.css';import '../src/features/today/today-dawn.css';
 const root=createRoot(document.getElementById('app'));
 window.renderCase=(points,amount=points)=>{const value=points===null?null:{points,amount,done:Math.max(0,amount),total:100,unit:'sessions',localDate:'2026-11-13'};
 flushSync(()=>root.render(<main><h1>合成データ・桁落ち回帰</h1><section id="delta"><SaveDelta value={value} field="points"/></section><section id="amount"><SaveDelta value={value} field="amount"/></section><section id="saved"><SaveFeedback value={value}/></section><section id="preview"><DraftProgressPreview value={value}/></section><section id="compact"><DraftProgressPreview value={value} compact/></section></main>));};`;
@@ -60,6 +61,8 @@ test('#253: real Chromium checks integer digits, old small values, signs and ann
   await evaluate('window.renderCase(1234)');
   for (const width of [390,1440]) {
     await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
+    assert.equal(await observe('getComputedStyle(document.querySelector("#compact .fr-draft-preview")).display'), width === 390 ? 'block' : 'none');
+    assert.equal(await observe('getComputedStyle(document.querySelector("#saved [role=status]")).position'), 'absolute');
     const shot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
     await writeFile('/tmp/points-evidence/' + width + '.png', Buffer.from(shot.data, 'base64'));
   }
