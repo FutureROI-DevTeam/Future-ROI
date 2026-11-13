@@ -6,7 +6,17 @@ import { join } from 'node:path';
 import { codeFiles, codeProfile, validateCode, validateCodeDiff, recordCodeReview } from './code-profile.mjs';
 import { validateContract, emptyLedger, enroll, reserve, finish, nextTask, authorizeRepair, initialize, transaction } from './state.mjs';
 import { publishDraft, historicalBaselinePR } from './github.mjs';
+import { collectScreenshots } from './code-runtime.mjs';
 const head='a'.repeat(40);
+test('screenshot export has fixed paths and rejects forged success, malformed data and unbounded output',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'roi-png-'));
+  try{
+    for(const output of ['PASS','../auth.json',Buffer.from('not a PNG').toString('base64'),Buffer.alloc(500001).toString('base64')])assert.throws(()=>collectScreenshots(()=>output,dir),/invalid-screenshot/);
+    const png=Buffer.from('89504e470d0a1a0a','hex').toString('base64');let reads=0;
+    collectScreenshots(args=>{assert.match(args[2],reads++===0?/390\.png/:/1440\.png/);return png;},dir);
+    assert.equal(reads,2);
+  }finally{rmSync(dir,{recursive:true});}
+});
 test('merged baseline history is not unfinished work, but same-Issue identity and unknown ancestry still block',()=>{
   const spec={issue:253},pr={state:'closed',merged_at:'2026-11-12',merge_commit_sha:head,head:{ref:'fix/244-actual-save-delta'},body:'Refs #253'};
   assert.equal(historicalBaselinePR(pr,spec,head,()=>true),true);

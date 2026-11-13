@@ -54,6 +54,17 @@ export function checkCodeContainer(inside, folder) {
   }
   return { isolation, checks };
 }
+export function collectScreenshots(inside, folder) {
+  const destination = join(folder, 'results/screenshots'); mkdirSync(destination, { recursive: true });
+  for (const width of [390, 1440]) {
+    // Docker cp does not expose this runtime's tmpfs. Read only two bounded PNGs,
+    // never an archive or candidate-selected path, while the container is still running.
+    const encoded = inside(['node', '-e', `const fs=require('node:fs'),p='/tmp/points-evidence/${width}.png',s=fs.lstatSync(p);if(!s.isFile()||s.size>500000)process.exit(1);process.stdout.write(fs.readFileSync(p).toString('base64'));`]).trim();
+    const bytes = Buffer.from(encoded, 'base64');
+    if (bytes.length > 500000 || bytes.toString('base64') !== encoded || bytes.subarray(0,8).toString('hex') !== '89504e470d0a1a0a') throw new Error('invalid-screenshot');
+    writeFileSync(join(destination, `${width}.png`), bytes);
+  }
+}
 
 export async function runCode(directory, batchId) {
   directory = resolve(directory); if (directory.includes(',')) throw new Error('unsupported-mount-path');
@@ -76,7 +87,7 @@ export async function runCode(directory, batchId) {
   const deadline=attempt.startedAt+contract.attemptMs,folder=join(directory,id,String(attempt.number));
   prepareCodePolicy(folder,contract.baseSha);
   const policyDigest=digest(readFileSync(join(folder,'policy/code-browser-check.mjs'),'utf8'));
-  let creationAttempted=false,created=false,stopped=false,passed=false,head=null,model=null,verification=null,diagnostic='code-verification-failed';
+  let creationAttempted=false,created=false,stopped=false,passed=false,head=null,model=null,verification=null,diagnostic='code-verification-failed',stage='model';
   const run=(bin,args,options={})=>{const remaining=deadline-Date.now()-15000;if(remaining<=0)throw new Error('attempt-time-budget');return command(bin,args,{...options,timeout:Math.min(240000,remaining)});};
   try {
     const generated=await generateProposal({directory,id,folder,deadline,base:contract.baseSha,documentTask:{issue:spec.issue,paths:codeFiles,sources,issueData:{title:issue.title,body:issue.body,comments}}});
@@ -87,18 +98,18 @@ export async function runCode(directory, batchId) {
     transaction(directory,s=>{s.tasks[id].active.phase='container-creating';}); creationAttempted=true;
     run('docker',codeContainerArgs(name,folder,contract.validatorImage,deadline));created=true;run('docker',['start',name]);
     transaction(directory,s=>{s.tasks[id].active.phase='container-running';});
-    verification=checkCodeContainer(args=>run('docker',['exec',name,...args]),folder);
-    run('docker',['cp',`${name}:/tmp/points-evidence`,join(folder,'results/screenshots')]);
+    stage='verification';verification=checkCodeContainer(args=>run('docker',['exec',name,...args]),folder);
+    stage='evidence-export';collectScreenshots(args=>run('docker',['exec',name,...args]),folder);
     stopAndConfirm(name,deadline);stopped=true;
     if(transaction(directory,s=>s.tasks[id].cancelRequested||s.tasks[id].active?.container!==name))throw new Error('cancelled');
-    const env={PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,GIT_INDEX_FILE:join(folder,'index'),GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'NUL',GIT_AUTHOR_NAME:'Future ROI Codex worker',GIT_AUTHOR_EMAIL:'worker@example.invalid',GIT_COMMITTER_NAME:'Future ROI Codex worker',GIT_COMMITTER_EMAIL:'worker@example.invalid'};
+    stage='git-artifact';const env={PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,GIT_INDEX_FILE:join(folder,'index'),GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'NUL',GIT_AUTHOR_NAME:'Future ROI Codex worker',GIT_AUTHOR_EMAIL:'worker@example.invalid',GIT_COMMITTER_NAME:'Future ROI Codex worker',GIT_COMMITTER_EMAIL:'worker@example.invalid'};
     const git=(args,options={})=>run('git',args,{env,...options}).trim();git(['read-tree',contract.baseSha]);
     for(const p of codeFiles){const blob=git(['hash-object','-w','--stdin'],{input:files[p]});git(['update-index','--cacheinfo',`100644,${blob},${p}`]);}
     head=git(['commit-tree',git(['write-tree']),'-p',task.head??contract.baseSha,'-m',`fix: #${spec.issue} の増減表示で整数部の桁落ちを防ぐ`]);verifyCandidate(contract,spec,head);
     writeFileSync(join(folder,'candidate.patch'),run('git',['diff','--binary',contract.baseSha,head]));
     writeFileSync(join(folder,'draft-pr.md'),`${spec.purpose}\n\nRefs #${spec.issue}\n\n基準 ${contract.baseSha}\n候補 ${head}\n\n隔離実Chromium・既存保存/試算・型/build検証済み。独立レビュー・PR後CIは未確認。残り4項目・Issue全体のClose・merge・配備は対象外。\n`);
     passed=true;diagnostic='none';
-  } catch(error) { if(/^[a-z][a-z-]+$/.test(error.message))diagnostic=error.message; }
+  } catch(error) { diagnostic=/^[a-z][a-z-]+$/.test(error.message)?error.message:`${stage}-failed`; }
   if(created&&!stopped){try{stopAndConfirm(name,deadline);stopped=true;}catch{/* Unknown still occupies the slot. */}}
   if(!creationAttempted){const active=transaction(directory,s=>s.tasks[id].active);stopped=!active?.authHome&&['model-stopped','model-preflight'].includes(active?.phase);}
   const receipt={container:name,stopped,passed:passed&&stopped,head,diagnostic,baselineSha:contract.baseSha,controllerSha:command('git',['rev-parse','HEAD']).trim(),validatorImage:contract.validatorImage,policyDigest,model,verification,externalCI:'not-run',totalCostCents:null};

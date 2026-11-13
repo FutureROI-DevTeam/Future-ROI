@@ -184,7 +184,10 @@ mainは現在active rulesetsで保護され、既存GitHub認証にpush権限が
 
 | ID / 重大度 / 対象 | 成立条件・悪影響・既存防御 | 根拠と最小修正 | 状態 |
 | --- | --- | --- | --- |
-| CR-05 / Blocking / 1d5b125 code-browser-check.mjs | 許可TSXがmain worldのObject.fromEntriesを上書きすると、実描画が誤ったままDOMの観測値だけ偽装できる。readonlyはNode/ファイルを守るが同worldのintrinsicsは守らない | 独立reviewerが元の2TSX＋観測shimを隔離Dockerへ入れ、誤表示のままpass1を再現。DOM読取りをCDP isolated world/contextIdへ移し、候補のglobal/prototypeと分離 | 修正済み・再確認待ち |
-| CR-06 / 必須経路の阻害 / 1d5b125 github.mjs | #253を参照したmerged #339のSaveFeedback変更を未完了競合と誤判定。生成前に停止する安全側の失敗 | 実照合でmodel0/attempt0の停止を確認。Issue固有branch/markerを持たず、merge commitが固定baseのancestorと確認できる履歴だけを重複判定から除く。未merge・同Issue・判定不能は停止を維持。17件の隣接回帰成功 | 修正済み・実接続再確認待ち |
+| CR-05 / Blocking / 1d5b125 code-browser-check.mjs | 許可TSXがmain worldのObject.fromEntriesを上書きすると、実描画が誤ったままDOMの観測値だけ偽装できる。readonlyはNode/ファイルを守るが同worldのintrinsicsは守らない | 独立reviewerが元の2TSX＋観測shimを隔離Dockerへ入れ、誤表示のままpass1を再現。DOM読取りをCDP isolated world/contextIdへ移し、候補のglobal/prototypeと分離。530e835で同shimを独立再実行し1,230と1,234の不一致でfail1。`.local/independent-code-review-cr05/`へ証拠保存 | 再確認済み |
+| CR-06 / 必須経路の阻害 / 1d5b125 github.mjs | #253を参照したmerged #339のSaveFeedback変更を未完了競合と誤判定。生成前に停止する安全側の失敗 | 実照合でmodel0/attempt0の停止を確認。Issue固有branch/markerを持たず、merge commitが固定baseのancestorと確認できる履歴だけを重複判定から除く。未merge・同Issue・判定不能は停止を維持。17件の隣接回帰成功、530e835の実接続で生成前の照合を通過 | 再確認済み |
+| CR-07 / 必須経路の阻害 / 530e835 code-runtime.mjs | 全検査後にDocker cpがtmpfsの画像を見つけられず候補commit前に停止。成功を偽らずawaiting-decision/停止確認を保持 | exec lsでは画像2枚が存在しcpだけ失敗することを隔離再現。実行中containerから固定2path/各500KBまでのPNGだけを読み、hostが保存。base64/PNG header/サイズを検査し、candidate選択path・archiveを展開しない。新経路で両PNG取得成功、code回帰6/6成功 | 再確認済み（worker全経路は再実行待ち） |
 
 初回Foundationは追記末尾の空行で失敗し、空行修正後に125 text/2904 links成功。受入条件の弱化や検査削除では解消していない。
+
+実Codex attempt1は入力7060/output842 token、追加creditsなし。対象2 TSXの3つのformat optionsだけを生成し、ci-report6/実Chromium1/保存・試算10/既存ブラウザ1、型/build成功。CR-07によりrun全体は失敗でheadなし。予約390,000ms・実143,936ms、過去の2回の照合を含めて台帳に保持し、失敗を削除/初期化しない。
