@@ -13,6 +13,7 @@ import { startStack } from '../../api/tests/helpers/stack.ts';
 import { cleanupAll } from '../../api/tests/helpers/cleanup.ts';
 import { launchBrowser } from './browser-startup.mjs';
 import { selectE2eDatabaseUrl } from './e2e-database.mjs';
+import { withResponseInterception } from './response-interception.mjs';
 
 // This entry never loads .env. Reject an inherited production URL before opening any DB.
 const databaseUrl = selectE2eDatabaseUrl();
@@ -252,11 +253,10 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
     await fillGoal('E2E uncertain create', 100, 0);
     const attempts = [];
     let lost = false;
-    const intercept = event => {
-      const message = JSON.parse(String(event.data));
-      if (message.method !== 'Fetch.requestPaused') return;
-      const paused = message.params;
-      void (async () => {
+    await withResponseInterception(cdp, {
+      patterns: [{ urlPattern: origin + '/api/goals', requestStage: 'Response' }],
+      onError: error => { interceptionError = error; },
+      onPaused: async paused => {
         if (paused.request.method === 'POST' && new URL(paused.request.url).pathname === '/api/goals') {
           attempts.push({ body: paused.request.postData, key: Object.entries(paused.request.headers).find(([key]) => key.toLowerCase() === 'idempotency-key')?.[1] });
           if (!lost) {
@@ -268,11 +268,8 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
           assert.equal(paused.responseStatusCode, 200, 'real ledger replay response');
         }
         await cdp.send('Fetch.continueRequest', { requestId: paused.requestId });
-      })().catch(error => { interceptionError = error; });
-    };
-    cdp.socket.addEventListener('message', intercept);
-    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: origin + '/api/goals', requestStage: 'Response' }] });
-    try {
+      },
+    }, async () => {
       await clickText('保存する');
       await until(`(${visible})(${button('もう一度保存')})`, 'uncertain create recovery');
       assert.equal(lost, true);
@@ -283,10 +280,7 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
       assert.equal(attempts.length, 2);
       assert.ok(attempts[0].key);
       assert.deepEqual(attempts[1], attempts[0], 'same operation key and body');
-    } finally {
-      await cdp.send('Fetch.disable');
-      cdp.socket.removeEventListener('message', intercept);
-    }
+    });
     const goals = await read('/api/goals');
     assert.equal(goals.length, 2, 'lost acknowledgement must not create a duplicate');
     recoveryGoal = goals.find(goal => goal.id !== goalA.id);
@@ -360,21 +354,17 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
     await clickText('量を変更');
     await input('.fr-amount input', 50);
     let lost = false;
-    const intercept = event => {
-      const message = JSON.parse(String(event.data));
-      if (message.method !== 'Fetch.requestPaused') return;
-      const paused = message.params;
-      void (async () => {
+    await withResponseInterception(cdp, {
+      patterns: [{ urlPattern: origin + path + '*', requestStage: 'Response' }],
+      onError: error => { interceptionError = error; },
+      onPaused: async paused => {
         if (!lost && paused.request.method === 'PUT' && new URL(paused.request.url).pathname === path) {
           assert.equal(paused.responseStatusCode, 200);
           lost = true;
           await cdp.send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'Aborted' });
         } else await cdp.send('Fetch.continueRequest', { requestId: paused.requestId });
-      })().catch(error => { interceptionError = error; });
-    };
-    cdp.socket.addEventListener('message', intercept);
-    await cdp.send('Fetch.enable', { patterns: [{ urlPattern: origin + path + '*', requestStage: 'Response' }] });
-    try {
+      },
+    }, async () => {
       await clickText('この量で記録');
       await until(`(${visible})(${button('もう一度保存')})`, 'lost PUT response recovery');
       await waitForRecord(recoveryGoal.id, 'DONE', 50);
@@ -388,9 +378,6 @@ test('built SPA → real HTTP auth/API → isolated PostgreSQL', { timeout: 240_
       await waitForRecord(recoveryGoal.id, 'DONE', 50);
       await until('!!document.querySelector("#fr-recorded-title")', 'PUT recovery completed');
       assert.equal(await evaluate('document.querySelector(".fr-save-feedback")?.textContent'), '', 'retry cannot repeat +20');
-    } finally {
-      await cdp.send('Fetch.disable');
-      cdp.socket.removeEventListener('message', intercept);
-    }
+    });
   });
 });

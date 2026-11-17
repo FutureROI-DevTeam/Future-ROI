@@ -3,7 +3,7 @@
 初めてリリースを担当する人は、[日本語リリース手順書](release-guide.md)から操作場所・準備・実施順・成功確認・停止条件を確認してください。同書は本書の公開受入条件を説明する補助ガイドです。文書／CIの成功は実デプロイ・一般公開の完了ではありません。
 
 HTML §16–17に基づく最小運用。ProductはFuture ROI（[Product Spec](../product-spec.md#現行状態2026-09-30)）。基本構成は[D-23](../architecture.md#d-23)にFE側の依頼者報告とBE本人の了承記録に基づく採用として記録。2026-10-08の公開第一候補は**FE・BEともVercel Hobby、DBはNeon Free、ローカル開発はDocker**（[D-25](../architecture.md#d-25)）。本人アカウント・厳密に費用0円を前提とし、採用確定・配備済みではない。一般公開・外部作成・課金の許可ではなく、公開先の最終受入、運用担当者、URLは未定。1〜2年の継続を視野に置くが、無料条件が変わらないことや稼働継続を保証しない。
-migrationは`npm run db:migrate`（認証→アプリの順。コンテナ内は`node apps/api/dist/db/migrate-cli.js all`。[手順](../DEVELOPMENT_GUIDE.md#起動)）。[Demo Seed](demo-seed.md)は認証作成済みuserIdとtimezoneを明示し、専用2Goalだけを作成・resetする。deployコマンドは未定で、存在しないコマンドは掲載しない。migration後の履歴・checksum・認証table／column欠落（暗黙の`id`を含む）の読み取り専用確認は`npm run db:check`（[使い方・有限の上限設定・限界](../DEVELOPMENT_GUIDE.md#起動)、#179）で行い、exit 0だけで公開・業務E2E完了としない。
+migrationは`npm run db:migrate`（認証→アプリの順。コンテナ内は`node apps/api/dist/db/migrate-cli.js all`。[手順](../DEVELOPMENT_GUIDE.md#起動)）。[Demo Seed](demo-seed.md)は認証作成済みuserIdとtimezoneを明示し、専用2Goalだけを作成・resetする。配備操作は[リリース手順](release-guide.md)、実装済みのbundle・CDと検査は[対応表](../change-map.md#確認記録と残課題)へ進む。実行・有効化には同手順の前提と承認が必要。migration後の履歴・checksum・認証table／column欠落（暗黙の`id`を含む）の読み取り専用確認は`npm run db:check`（[使い方・有限の上限設定・限界](../DEVELOPMENT_GUIDE.md#起動)、#179）で行い、exit 0だけで公開・業務E2E完了としない。
 
 ## 統合版のデプロイ準備（#205）
 
