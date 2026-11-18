@@ -19,7 +19,7 @@ export function DraftProgressPreview({ value, compact = false }: { value: DraftP
       <p className="fr-draft-preview__delta">
         {value.amount === 0 ? '量・進捗は変わりません' : (
           <>
-            {sign}{fmt.record(Math.abs(value.amount))} / {sign}{Math.abs(value.points).toLocaleString('ja-JP', { maximumSignificantDigits: 3 })}パーセントポイント
+            {sign}{fmt.record(Math.abs(value.amount))} / {sign}{Math.abs(value.points).toLocaleString('ja-JP', Math.abs(value.points) >= 1000 ? { maximumFractionDigits: 0 } : { maximumSignificantDigits: 3 })}パーセントポイント
           </>
         )}
       </p>
