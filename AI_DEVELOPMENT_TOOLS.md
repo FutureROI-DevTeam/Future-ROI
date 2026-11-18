@@ -33,9 +33,17 @@ Issue #47の[ML Agent Harness](https://github.com/jogi-hack-2026-team/jogi-hack-
 
 個人環境のSkillは共有リポジトリへの導入済み一覧に含めない。利用時は実際の検出・本文・依存ツールを確認し、導入や権限追加は別の判断とする。既存の作業用Skillを優先し、`review-gate`／`pr-review`と同等の差分レビューに`find-bugs`を追加で実行しない。
 
-- UIは[変更対応表](docs/change-map.md)と[Webの依存・検証コマンド](apps/web/package.json)から対象を選ぶ。現行はReact＋Viteのため、Reactの補助指針からNext.js専用規則を持ち込まない。UX／a11y監査時は対象画面を限定し、重要導線・ブラウザ特有問題の確認では既存の実ブラウザ検証を優先する。
 - 予測・統計的主張・実験解釈を評価するときは[Product Spec](docs/product-spec.md)、Architectureの[Prediction Engine](docs/architecture.md#prediction-engine)と[Test Strategy](docs/architecture.md#test-strategy)、[実験・根拠の索引](docs/prediction/experiment-history.md)を先に読む。必要なら`scientific-critical-thinking`を補助に使う。P50／P80／Δとモデル仮定は正本に従い、数値テスト・合成比較の成功を実測に対する精度・校正・製品受入の証明にしない。
 - 小さな文書・文言修正は意味・参照・差分と既存の文書検証を基本とする。既存のレビューSkillが要求するUI変更の実ブラウザ確認など、プロジェクトの必須検証は維持し、重要な表示や挙動への影響に応じて追加する。設定点検や一般の報告書作成を完全セキュリティ監査の依頼と解釈しない。
+
+### CodexでUIを設計・検証する
+
+1. **対象画面と利用者が行う操作を決める。** Issueの受け入れ条件を[Product Spec](docs/product-spec.md)と[画面設計書](docs/design.md)で確認し、[変更対応表](docs/change-map.md#アプリの仕様と実装)から既存の画面・部品・検証をたどる。通常状態に加え、変更に関係する未入力・通信失敗・保存中などの状態を選ぶ。Reactの実装・レビューで`vercel-react-best-practices`を使う場合は、現行の[React＋Vite](apps/web/package.json)に当てはまる指針を参照する。
+2. **画面構成や情報の優先順位に判断が必要なときだけ案を比較する。** 現行画面を基準に、変更案で主要な操作が見つかるか、スマートフォン幅で情報と操作が見えるかを確認する。既存のFigma案から実装するときは、参照権限のある対象フレームをFigma MCPと`figma-design-to-code`で読む。ImageGenを使う場合は合成データによる視覚案に限る。判断が必要な案はIssue・PRに理由とともに提示し、仕様や導線の変更は既存の承認手順に従う。
+3. **変更した操作と表示を実画面で確かめる。** [利用前の確認](#利用前の確認)に従い、既存のChrome/CDP回帰と、必要な場合は隔離環境のE2Eを使う。対象画面のUX・アクセシビリティを監査する場合は、利用可能な`web-design-guidelines`を補助にし、[画面設計書のアクセシビリティ項目](docs/design.md#アクセシビリティ)から変更に関係する点を選ぶ。例えばフォームではキーボードでの操作、フォーカスの移動・復帰、エラー通知を確認する。読み上げ自体が受け入れ条件なら実際の支援技術で確かめ、未実施ならPRに記録する。
+4. **既存のPRレビューへ渡す。** `review-gate`と`documentation-sync`を使い、確認した画面・状態・環境と結果、未確認事項をPRに記録する。画像は[UI変更時の既存ルール](CONTRIBUTING.md#ui変更がある場合)に従い、合成データで撮影する。開発ハーネスで実行する場合は、[#340の実行契約](https://github.com/FutureROI-DevTeam/Future-ROI/issues/340)で許可された入力・操作・検証の範囲に従う。
+
+共通SkillやMCPは、既存の利用環境を再利用する。各セッションで必要なSkillの検出と本文、ツールの接続を確認し、Figmaを使うときは対象ファイルへの権限も確認する。使えない補助ツールがあれば、画面設計書と既存画面で進められる範囲を確認し、残った制約をIssue・PRに記録する。インストール・権限追加やチームの正式採択には別途判断が必要となる。
 
 ## リポジトリで確認できる導入状況
 
