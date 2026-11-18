@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "repository": "FutureROI-DevTeam/Future-ROI",
+  "batchId": "local-comparison-1",
+  "mode": "local-fixture",
+  "publish": false,
+  "workers": 1,
+  "reviewLimit": 1,
+  "maxRepairs": 3,
+  "attemptMs": 60000,
+  "taskMs": 240000,
+  "batchMs": 480000,
+  "lifetimeMs": 3600000,
+  "maxCostCents": 0,
+  "tasks": [{
+    "id": "fixture-addition",
+    "revision": 1,
+    "purpose": "無害な整数加算fixtureの誤実装を直し、隔離検証とDraft成果物まで通す",
+    "profile": "integer-addition-v1",
+    "allowedFiles": ["experiments/development-harness-fixture/answer.mjs"],
+    "dependencies": [],
+    "operations": ["apply-proposal", "verify", "prepare-draft"],
+    "acceptance": "integer-addition-v1; ci-report-regressions; sandbox-probe",
+    "exclusions": "product,ci,harness,policy,auth,tests,publish,merge,deploy"
+  }]
+}

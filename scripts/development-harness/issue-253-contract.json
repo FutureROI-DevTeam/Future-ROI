@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "repository": "FutureROI-DevTeam/Future-ROI",
+  "batchId": "issue-code-253-v1",
+  "mode": "codex-issue-code",
+  "publish": true,
+  "workers": 1,
+  "reviewLimit": 1,
+  "maxRepairs": 3,
+  "attemptMs": 300000,
+  "taskMs": 1800000,
+  "batchMs": 1800000,
+  "publishMs": 120000,
+  "lifetimeMs": 86400000,
+  "maxCostCents": 0,
+  "auth": "existing-chatgpt-no-credits",
+  "maxModelRuns": 4,
+  "baseSha": "40ddc510919d85884160d512009abe4e345a1a8f",
+  "validatorImage": "sha256:bd6f23ce821ae72f728e1a035d909b7b69f059c2faadd29cfa9d9e3714ab5167",
+  "tasks": [{
+    "id": "issue-253",
+    "issue": 253,
+    "revision": 1,
+    "profile": "issue-253-points-v1",
+    "purpose": "採択済み#253指摘2に限り、保存後通知・可視pt・未保存試算の整数部の桁落ちを防ぐ",
+    "branch": "fix/253-harness",
+    "allowedFiles": ["apps/web/src/features/logs/SaveFeedback.tsx", "apps/web/src/features/today/DraftProgressPreview.tsx"],
+    "contextFiles": [
+      "apps/web/src/features/logs/SaveFeedback.tsx",
+      "apps/web/src/features/today/DraftProgressPreview.tsx",
+      "apps/web/src/features/logs/save-feedback.ts",
+      "apps/web/src/features/logs/draft-preview.ts",
+      "apps/web/src/copy/amount.ts",
+      "apps/web/src/copy/progress.ts"
+    ],
+    "dependencies": [],
+    "operations": ["generate-code", "verify", "push-branch", "create-draft", "observe-ci"],
+    "acceptance": "2026-11-13依頼者が限定採択。SaveDelta(points)、SaveFeedbackのstatus、DraftProgressPreviewの通常/compactで±1234→±1,234と大きい整数の全桁を表示する。絶対値1000以上は整数表示、1000未満は従来3有効桁（999.9→1,000、0.667/0.25/微小値を維持）。amount表示、符号、null/0、ARIA・通知タイミング、計算・保存・owner・初期質問は変更しない。既存保存/試算・実Chromium・型/build、immutable検査/依存/結果の書込み拒否、独立レビューと同headの実CIを確認する。指摘1/3/4/5とIssue全体Close、利用者確認、merge/配備は対象外。",
+    "exclusions": "other-product-changes,ci,harness,policy,auth,tests,dependencies,adoption,issue-close,merge,deploy"
+  }]
+}
