@@ -172,7 +172,7 @@ AI向けツール、MCP、CLI、Skillsの採用方針の正本。
 
 ### GitHub Projects
 
-現在のStatusとScopeの正本。
+現在のStatusと大会時のScopeの正本。
 
 ---
 
@@ -477,7 +477,7 @@ Team Decision
 ↓
 `scope-guard`
 ↓
-Must / Should / Couldの影響整理
+利用者への影響・作業範囲・依存・検証負担の整理
 ↓
 Team Decision
 
@@ -597,23 +597,23 @@ Issueのスコープ外を勝手に実装しない。
 
 ## 17. Scope
 
-GitHub Projectsでは以下を使用する。
+保守Issueは[Definition of Ready](CONTRIBUTING.md#definition-of-ready)と、AIに指定された実行範囲・承認を着手前に確認する。作業範囲はIssueに記録する。
+
+機能追加や作業範囲の変更を検討する場合は、必要に応じて `scope-guard` Skillを使用する。
 
 ### Must
 
-Code Freezeまでに必ず完成させる。
+Code Freezeまでの必須項目。
 
 ### Should
 
-Must完成後に取り組む。
+大会時にMustの次に扱うとした項目。
 
 ### Could
 
-余力がある場合のみ取り組む。
+大会時に余力の範囲で扱うとした項目。
 
-Mustの完成度を犠牲にしてShould / Couldを実装しない。
-
-機能追加・Scope変更を検討する場合は、必要に応じて `scope-guard` Skillを使用する。
+大会時の分類を参照・記録するときは[CONTRIBUTINGのScope](CONTRIBUTING.md#statusとscope)に従う。
 
 ---
 

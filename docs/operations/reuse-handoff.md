@@ -4,7 +4,7 @@
 
 | 資産 | 残す理由と現在の到達点 | 次の案で行うこと |
 | --- | --- | --- |
-| Issue Forms、PRテンプレート、[開発ルール](../../CONTRIBUTING.md)、[AI向けSkills](../../.agents/skills/) | チケットからレビューまでの共通手順。Productの中身を決めない | 新案のIssueに目的・完了条件・Scopeを記録してから着手する。旧案のIssueを再開しない |
+| Issue Forms、PRテンプレート、[開発ルール](../../CONTRIBUTING.md)、[AI向けSkills](../../.agents/skills/) | チケットからレビューまでの共通手順。Productの中身を決めない | 新案のIssueに目的・作業範囲・完了条件を記録し、[着手条件](../../CONTRIBUTING.md#definition-of-ready)を確認する。旧案のIssueを再開しない |
 | [文書・設定チェック](../../scripts/check-foundation.ps1)と[Foundation CI](../../.github/workflows/foundation.yml) | リンク、形式、設定の検査を継続できる。Productの動作試験ではない | 文書変更時に実行し、追加した仕様・コード・確認方法を[対応表](../change-map.md)へつなぐ |
 | [旧Node/npm設定](https://github.com/jogi-hack-2026-team/jogi-hack-2026/blob/77c71a5f248a4dce4ce9fb8af6619b41541be9d8/archive/music-exploration/mise.toml)、[旧Web/APIの最小起動構成](https://github.com/jogi-hack-2026-team/jogi-hack-2026/tree/77c71a5f248a4dce4ce9fb8af6619b41541be9d8/archive/music-exploration/apps/)、[旧Application CI](https://github.com/jogi-hack-2026-team/jogi-hack-2026/blob/77c71a5f248a4dce4ce9fb8af6619b41541be9d8/archive/music-exploration/.github/workflows/application.yml) | 当時の版固定・型検査・ビルドの土台。WebとAPIはhealthの確認までで、Product機能はない。現在は履歴として退避 | 新案の要件からFE/BE構成の必要性を再評価する。使う場合は新案の契約・テストを追加する。既存のbuild成功を機能完成と扱わない |
 | [旧ローカルCompose](https://github.com/jogi-hack-2026-team/jogi-hack-2026/blob/77c71a5f248a4dce4ce9fb8af6619b41541be9d8/archive/music-exploration/compose.yaml)と[旧起動手順](https://github.com/jogi-hack-2026-team/jogi-hack-2026/blob/77c71a5f248a4dce4ce9fb8af6619b41541be9d8/archive/music-exploration/docs/DEVELOPMENT_GUIDE.md#composeでwebapipostgresqlを起動する) | 当時Web/API/開発用DBをまとめて起動した記録。DB接続やmigration、公開環境は別。現在は履歴として退避 | DBが必要か要件から判断する。採用する場合はschema、migration、接続試験を新案のIssueで決める |

@@ -5,7 +5,7 @@ type: Feature
 body:
   - type: markdown
     attributes:
-      value: 既存Issueを検索して重複を避けてください。Secretの実値は記載しないでください。着手者はAssigneeとProjectのScopeを設定します。
+      value: 既存Issueを検索して重複を避けてください。Secretの実値は記載しないでください。作業担当者をAssigneeに設定し、[着手条件](https://github.com/FutureROI-DevTeam/Future-ROI/blob/main/CONTRIBUTING.md#definition-of-ready)を確認してください。
   - type: textarea
     id: field-1
     attributes:
