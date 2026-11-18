@@ -235,7 +235,7 @@ Future ROIは、最上位 → 領域の子 → 実装Issueの3階層で追跡し
 | 領域の子 | [FE #88](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/88)、[BE #89](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/89)、[Prediction #90](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/90) | 配下の実装Issueと領域の受け入れ条件を管理する |
 | 実装Issue | 各領域のSub-issuesから既存Issueを開く | 個別の目的・依存・完了条件に沿って実装と検証を行う |
 
-最上位・領域Issueは管理用です。Branch・PRは個別の変更を扱う作業Issueへ紐付け、管理Issueごとに実装PRを作る必要はありません。担当者はIssueのAssignees、現在のStatus・Scopeは[GitHub Projects](https://github.com/orgs/jogi-hack-2026-team/projects/1)を確認します。このガイドへ担当表・現在Status・実装Issueごとの依存一覧を複製しません。
+最上位・領域Issueは管理用です。Branch・PRは個別の変更を扱う作業Issueへ紐付け、管理Issueごとに実装PRを作る必要はありません。担当者はIssueのAssignees、現在のStatusは[GitHub Projects](https://github.com/orgs/jogi-hack-2026-team/projects/1)で確認します。大会時の分類は[Scope](#8-scope)を参照します。
 
 ### 管理IssueのStatus
 
@@ -243,7 +243,7 @@ Future ROIは、最上位 → 領域の子 → 実装Issueの3階層で追跡し
 
 | Status | 管理Issueでの扱い |
 | --- | --- |
-| `Backlog` | 管理範囲・配下のIssue・受け入れ条件・Assignee・Scopeがまだ整理されていない |
+| `Backlog` | 管理範囲・配下のIssue・受け入れ条件・Assigneeがまだ整理されていない |
 | `Ready` | 上記が整理され、配下の作業は未着手。配下の実装着手を許可する意味ではない |
 | `In progress` | 配下の作業Issueが1件でも着手したら変更する。最上位も領域配下の着手に合わせて変更し、自身の完了条件を満たすまで維持する |
 | `In review` | 管理Issue自体には使わない。配下のPRレビューは個別の作業Issueで追跡し、管理Issueは `In progress` を維持する |
@@ -257,13 +257,13 @@ Future ROIは、最上位 → 領域の子 → 実装Issueの3階層で追跡し
 
 領域IssueのReadyは管理用であり、配下の実装開始を許可する意味ではありません。最上位がReadyでも同様です。各実装Issueの着手可否を個別に確認します。
 
-1. 対象の最新Issue本文・コメント、親・領域Issue、依存先を読み、目的・Scope・完了条件・AssigneeとProjectのStatusを確認します。既存の実装Issueを再利用し、同じ作業を別の領域名や別エージェント用に重複起票しません。
+1. 対象の最新Issue本文・コメント、親・領域Issue、依存先を読み、目的・作業範囲・完了条件・AssigneeとProjectのStatusを確認します。既存の実装Issueを再利用し、同じ作業を別の領域名や別エージェント用に重複起票しません。
 2. Issueの開発情報・Development欄から関連PRを開き、最新の差分・レビュー・未解決指摘・CI・Merge状況を確認します。作業中のPRがあれば、既存作業との重複を避けます。
 3. 正式仕様の[Product Spec](product-spec.md)・[Architecture](architecture.md)と[変更対応表](change-map.md)を読み、対象Requirement・Decision・実装・テストを照合します。仕様反映は[#69](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/69)とその関連PR、技術採択は[#84](https://github.com/jogi-hack-2026-team/jogi-hack-2026/issues/84)の最新記録まで確認します。未Mergeの仕様案、技術候補、Supporting Artifactの検証成功・Approve・Mergeを正式採択や本実装完了へ昇格させません。
 4. 各IssueのHard依存（着手の前提）とIntegration依存（結合・完了までに確認する条件）、本文・ラベルのBLOCKED、人間の判断待ち、必要な技術の採択・正式反映を確認します。Hard依存はClose表示だけでなく完了条件と必要なMergeの証拠を確認します。領域図の要約だけで依存を決めず、各実装Issueの記載を読みます。
 5. 対象の[Definition of Ready](../CONTRIBUTING.md#definition-of-ready)を満たしてから専用Branchで着手します。例外として先行できる作業は、対象Issueに明記された承認済みの範囲だけです。モックやスタブで進められることをHard依存・BLOCKEDの解除と解釈しません。
 
-既存Issueや正式仕様に不一致・不足があれば、根拠と必要な判断をIssueへ記録してチームに確認します。仕様・依存関係・Scopeを無断で書き換えたり、BLOCKEDを解除したりしません。読めない情報は未確認として扱い、着手条件を推測で満たしたことにしません。別作業が必要な場合も既存Issueを検索してから、[チケット作成の着手条件](../CONTRIBUTING.md#チケット作成を着手条件にする)に従います。
+既存Issueや正式仕様に不一致・不足があれば、根拠と必要な判断をIssueへ記録してチームに確認します。仕様・依存関係・作業範囲を無断で書き換えたり、BLOCKEDを解除したりしません。読めない情報は未確認として扱い、着手条件を推測で満たしたことにしません。別作業が必要な場合も既存Issueを検索してから、[チケット作成の着手条件](../CONTRIBUTING.md#チケット作成を着手条件にする)に従います。
 
 ### Closeと製品完成を確認する
 
@@ -305,17 +305,7 @@ Issueを作った人ではなく、実際に作業する人を設定してくだ
 
 # 8. Scope
 
-GitHub Projectsでは、IssueにScopeを設定します。
-
-このプロジェクトでは、
-
-| Scope  | 意味                               |
-| ------ | ---------------------------------- |
-| Must   | コードフリーズまでに必ず完成させる |
-| Should | Must完成後に取り組む               |
-| Could  | 余力がある場合のみ取り組む         |
-
-Mustの完成度を犠牲にしてShouldやCouldを実装しません。
+Projectの `Scope` は、大会時のMVP・提出範囲を追跡するための欄です。分類の意味と大会後の扱いは[CONTRIBUTINGのScope](../CONTRIBUTING.md#statusとscope)を参照してください。
 
 ---
 
@@ -362,10 +352,10 @@ Done
 
 例えば、
 
-- 仕様が決まっていない
-- やるか判断していない
-- 調査が必要
-- Scopeが決まっていない
+- 実装に必要な仕様が決まっていない
+- 取り組む作業として選ばれていない
+- 着手前に済ませる調査が残っている
+- 作業範囲や完了条件が決まっていない
 
 場合です。
 
@@ -391,17 +381,7 @@ Pull RequestがmainへMergeされ、作業が完了した状態です。
 
 # 11. Definition of Ready
 
-個別の作業Issueを`Ready`にするには、最低限以下を満たしている必要があります。管理Issueの扱いと実装前の再確認は[Future ROIのIssue運用](#future-roiのissue運用)に従います。
-
-- [ ] 目的・背景が分かる
-- [ ] やることが分かる
-- [ ] 完了条件が分かる
-- [ ] Scopeが設定されている
-- [ ] Assigneeが決まっている
-- [ ] 大きすぎるIssueになっていない
-- [ ] 必要な前提作業が完了している
-
-条件を満たしていないIssueは、原則として実装を開始しません。
+個別の作業Issueは[CONTRIBUTINGのDefinition of Ready](../CONTRIBUTING.md#definition-of-ready)に従います。管理Issueの扱いと実装前の再確認は[Future ROIのIssue運用](#future-roiのissue運用)を参照してください。
 
 ---
 
@@ -1300,11 +1280,11 @@ git push --force
 ```text
 Issueを作る
 ↓
-目的・完了条件を整理
+取り組む対象を決め、目的・作業範囲・完了条件を整理
 ↓
 Assignee設定
 ↓
-Scope設定
+着手を妨げる依存を確認
 ↓
 Ready
 ↓
@@ -1359,10 +1339,10 @@ Branch削除
 - 結果が0件の場合の表示がある
 ```
 
-Scope：
+作業範囲：
 
 ```text
-Must
+検索の入力・結果表示・0件時の表示
 ```
 
 Assignee：
@@ -1373,7 +1353,7 @@ Assignee：
 
 ## Ready
 
-仕様・完了条件が決まったら、
+取り組む対象として選ばれ、[Definition of Ready](#11-definition-of-ready)を満たしたら、
 
 ```text
 Backlog

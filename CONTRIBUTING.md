@@ -9,13 +9,13 @@
 
 開発期間と2026-10-12のCode Freezeは大会時の提出に関する条件として保持します。大会後に明示依頼された保守は、そのIssueの目的・完了条件・変更範囲で扱い、提出済み資料や大会時の版を遡って変更したことにはしません。通常のIssue・Branch・Review・検証の規則は引き続き適用します。
 
-大会当時のMust / Should / Couldや未完了の受入条件を、時間の経過だけで変更・完了にしません。追加作業のScopeは依頼者が指定し、Projectに記録します。条件付きセルフマージの継続・解除と保護設定の変更も、文書整理から自動決定しません。
+大会当時のMust / Should / Couldと未完了の受入条件は、当時の判断と追跡のために保持します。保守Issueの着手は[Definition of Ready](#definition-of-ready)で判断し、着手順は利用者への影響、緊急性、依存を解消する効果を見て決めます。条件付きセルフマージの継続・解除と保護設定の変更も、文書整理から自動決定しません。
 
 基本的に以下の流れで開発します。
 
 1. 対応する既存Issueを確認し、なければ変更着手前にIssueを作成する
 2. Issueの目的・内容・完了条件を確認する
-3. 担当者が自分をAssigneeに設定し、Scopeを設定する
+3. 担当者が自分をAssigneeに設定し、Definition of Readyを確認する
 4. Issueを `Ready` にする
 5. 最新の `main` から作業Branchを作成する
 6. Issue本文の「開発情報」に作業Branchを記載し、Push後にリンクを追記する
@@ -98,11 +98,11 @@
 実装・修正・設定変更・ドキュメント更新は、変更着手前にGitHub Issueへ紐付けます。
 小さな変更やローカルだけの作業でも、チケットを省略しません。
 
-Future ROIの階層・管理IssueのReady・着手前の再確認・Closeと製品完成の判断手順は、[開発ガイドのIssue運用](docs/DEVELOPMENT_GUIDE.md#future-roiのissue運用)へ集約します。個別Issueの目的・依存・完了条件とProjectの担当・Status・ScopeはGitHubで確認し、文書へ現在値を複製しません。
+Future ROIの階層・管理IssueのReady・着手前の再確認・Closeと製品完成の判断手順は、[開発ガイドのIssue運用](docs/DEVELOPMENT_GUIDE.md#future-roiのissue運用)へ集約します。作業の目的・範囲・依存・完了条件・担当はIssueで、進捗はProjectのStatusで確認します。大会時の分類は[Scopeの運用](#statusとscope)を参照します。
 
 1. 既存Issueを検索し、目的・範囲が一致する未完了Issueがあれば利用します。追加修正も同じ範囲なら同じIssueに記録し、重複作成しません。
 2. 対応するIssueがなければ、目的・範囲・完了条件を記載して作成します。投稿案をローカルに用意しただけでは作成完了ではありません。
-3. Issue番号・URL、Assignee、Scope、Definition of Readyを確認してから、番号付きBranchで変更を開始します。
+3. Issue番号・URLとDefinition of Readyを確認してから、番号付きBranchで変更を開始します。
 
 Issue作成に承認が必要な依頼では、投稿する内容を示し、**変更着手前に**承認を求めます。
 ログイン・権限不足や承認待ちの場合も、チケット未作成のまま実装・設定・文書編集を先行しません。
@@ -242,16 +242,14 @@ Issue作成者と作業担当者が異なる場合も、実際に作業する人
 
 ### StatusとScope
 
-Statusは作業の進捗、Scopeは完成の優先範囲です。両者を別々に設定します。
-Statusの値・更新方法は[GitHub Projects](#github-projects)を参照してください。
-
-GitHub Projectsの `Scope` を使用します。
+Statusは作業の進捗を表します。値と更新方法は[GitHub Projects](#github-projects)を参照してください。
+Projectの `Scope` は大会時のMVP・提出範囲を追跡するための分類です。
 
 - `Must`: コードフリーズまでに必ず完成させる
 - `Should`: Must完成後に取り組む
 - `Could`: 余力がある場合のみ取り組む
 
-Mustの完成度を犠牲にしてShouldやCouldを実装しないでください。
+既存の分類値は設定時の記録として保持します。大会時の判断を確認するときは、当時の仕様やIssueの記録と照合します。保守Issueはこの欄が空でも、[Definition of Ready](#definition-of-ready)を満たせば `Ready` にできます。今回取り組む作業範囲は、個別のIssueに記録します。
 
 ---
 
@@ -279,7 +277,7 @@ Projectの自動追加対象はIssueです。PRはIssue本文の開発情報とD
 | 対象 | タイミング | Status |
 | --- | --- | --- |
 | Issue | Issueを作成し、まだ着手条件を満たしていない | Backlog |
-| Issue | 目的・完了条件・Assignee・Scopeが決まり、着手できる | Ready |
+| Issue | [Definition of Ready](#definition-of-ready)を満たし、着手できる | Ready |
 | Issue | Branchを作成して作業を開始する | In Progress |
 | Issue | Pull Requestを作成してレビューを依頼する | In Review |
 | Issue | `Request changes`を受けて修正する | In Progress |
@@ -292,10 +290,10 @@ Projectの自動追加対象はIssueです。PRはIssue本文の開発情報とD
 
 例：
 
-- 仕様が未確定
-- やるか判断していない
-- 調査が必要
-- Scopeが決まっていない
+- 実装に必要な仕様が未確定
+- 取り組む作業として選ばれていない
+- 着手前に済ませる調査が残っている
+- 作業範囲や完了条件が決まっていない
 
 ### Ready
 
@@ -321,15 +319,18 @@ PRが `main` へMergeされ、作業が完了した状態です。
 
 個別の作業Issueを `Ready` にするには、最低限以下を満たしている必要があります。管理Issueの扱いと実装前の再確認は[開発ガイド](docs/DEVELOPMENT_GUIDE.md#future-roiのissue運用)に従います。
 
-- [ ] 目的・背景が分かる
-- [ ] やることが分かる
-- [ ] 完了条件が分かる
-- [ ] Scopeが設定されている
+- [ ] 依頼者の明示依頼やチームの作業選定により、取り組む対象がIssueで分かる
+- [ ] 目的・背景と、今回の作業範囲が明確になっている
+- [ ] 検証できる完了条件がある
 - [ ] 実際の作業担当者がAssigneeに設定されている
 - [ ] 大きすぎるIssueになっていない
 - [ ] 必要な前提作業が完了している
 
-条件を満たしていないIssueは、原則として実装を開始しません。
+実装は上の条件を満たすIssueで始めます。先行する作業は、Issueに明記された承認範囲に従います。
+
+調査Issueは、調査対象として選ばれ、上の条件を満たせば、結論が未定でも `Ready` にできます。調査結果を仕様に採用する判断や、その実装への着手は、別途扱います。
+
+`Ready` は着手できる準備が整ったことを表します。AIが作業する場合は、依頼や承認済みの実行契約で指定された対象と作業範囲、必要な承認、WIP上限を着手前に確認します。
 
 ---
 
