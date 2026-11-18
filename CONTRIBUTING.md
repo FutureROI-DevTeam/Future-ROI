@@ -249,7 +249,7 @@ Projectの `Scope` は大会時のMVP・提出範囲を追跡するための分�
 - `Should`: Must完成後に取り組む
 - `Could`: 余力がある場合のみ取り組む
 
-既存の分類値は大会時の判断として保持します。保守Issueはこの欄が空でも、[Definition of Ready](#definition-of-ready)を満たせば `Ready` にできます。今回取り組む作業範囲は、個別のIssueに記録します。
+既存の分類値は設定時の記録として保持します。大会時の判断を確認するときは、当時の仕様やIssueの記録と照合します。保守Issueはこの欄が空でも、[Definition of Ready](#definition-of-ready)を満たせば `Ready` にできます。今回取り組む作業範囲は、個別のIssueに記録します。
 
 ---
 

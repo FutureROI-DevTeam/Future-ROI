@@ -172,7 +172,7 @@ AI向けツール、MCP、CLI、Skillsの採用方針の正本。
 
 ### GitHub Projects
 
-現在のStatusと大会時のScopeの正本。
+現在のStatusとScope欄の値の正本。
 
 ---
 
