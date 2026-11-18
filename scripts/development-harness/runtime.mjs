@@ -210,9 +210,14 @@ export async function runOne(directory, batchId, proposal) {
     }
   }
   let stopped = false;
-  if (!creationAttempted && contract.mode === 'codex-fixture') {
-    const active = transaction(directory, s => s.tasks[id].active);
-    stopped = !!active && !active.authHome && (active.phase === 'model-stopped' || active.phase === 'model-preflight');
+  if (!creationAttempted) {
+    // A local fixture has no model process; before docker create there is no worker
+    // to stop. An attempted create with a lost response still keeps the slot occupied.
+    if (contract.mode === 'local-fixture') { stopped = true; }
+    else if (contract.mode === 'codex-fixture') {
+      const active = transaction(directory, s => s.tasks[id].active);
+      stopped = !!active && !active.authHome && (active.phase === 'model-stopped' || active.phase === 'model-preflight');
+    }
   }
   if (created) {
     try { stopAndConfirm(name, deadline); stopped = true; } catch { /* Occupy the slot until explicit recovery. */ }

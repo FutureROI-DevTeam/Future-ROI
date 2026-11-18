@@ -211,3 +211,16 @@ attempt2の入力7105/output842、2attempt合計input14165/output1684。この�
 候補1094fc65は独立reviewerが実Git差分・proposal・mount対象・policy digest・全ログ・receiptを照合しBlockingなし。publisherがDraft #347を作成し、同headの必須CI4件（Application43372578453 / Foundation43372578428、attempt1）が成功。台帳のci観測で発行元・必須step・実checkoutを照合してreview-readyへ遷移した。headは固定し、#253指摘1/3/4/5、Issue Close、人の受入を残す。初回のCR-07保存失敗から今回の成果物取得・commit・Draft・CIまで通り、全経路も再確認済み。
 
 CR-08（Blocking、ba0dd9e `.github/workflows/foundation.yml`）: ハーネス検査stepのrunインデントが深く、Foundationが起動しなかった。Application3件は成功したが必須4件照合はpassed:falseとなり、CI完了を拒否した。既存の文書Foundation検査はYAML構文を検査しないため、ローカル成功だけでは発見できなかった。runのインデント1行のみ修正し、独立reviewerが既存PyYAML6.0.2で旧版ScannerError/修正版受理と正しいstep所属を確認した。隣接42/42とFoundation125 text/2904 linksも成功。新headの実4CIは再確認待ち。合否条件や必須checkは変更しない。最終headと実CI証拠はPR #344 / Issue #340の開発情報に記録する。
+
+## 2026-11-18 PR #344のレビュー修正
+
+対象はmain取込み後のhead `40378da9af806c8b55c53d0428b53311aee67978`。GitHubレビューのP2指摘2件を、既存Issue #340の範囲で修正した。製品画面・許可scope・課金/認証・保護ルール・予算の上限は変更しない。
+
+- 修復上限後の偽成功: `run-codex`で4回連続失敗すると、実行不能な修復を承認して次のscheduler停止をexit 0で返していた。台帳のコピーに修復を適用し、既存schedulerが同じ作業の次attemptを許可する場合だけ実台帳へ承認を反映する。回数・task/batch時間・有効期限で実行不能ならawaiting-decisionと消費済み予算を保持しexit 1。修復後の合格はexit 0を維持する。
+- 作成前取消の枠残留: local-fixtureはモデルprocessを起動しないが、Docker create前に取り消してもCodex用の終了判定だけを行い、active枠が残っていた。create未試行のlocal-fixtureを終了確認済みとして取消receiptを保存し、明示resume後に同じ累積予算で再開できるようにした。create試行後の応答喪失は終了証拠にせず枠を保持する。
+
+新しい`lifecycle.test.mjs`は実CLI/runtimeのsourceと実台帳を使い、外部process境界と取消タイミングを制御する。修正前は8件中6件失敗（連続誤出力・禁止proposal・task時間・batch時間・期限・作成前取消）、既存の修復成功とcreate応答喪失の2件は成功。修正後は8/8成功・skip 0。モデル呼出し・GitHub書込み・Docker起動はこの回帰では行わない。Foundationの既存ハーネスstepにも追加した。
+
+最終ローカル検証は状態12/Codex4/docs12/code8/終了・取消8/ci-report6の50/50成功、fail/cancel/skip/todo 0。Foundationは127 text files・2991 local links・環境例・ignore・差分空白検査に成功。
+
+ローカル環境はWindows・Node 24.22.3。Docker daemonは停止中のため、実Dockerの既存回帰はローカル未実行。実CIの結果はPRの修正後headに紐づけて確認し、旧headの成功を流用しない。製品受入・本番動作・任意Issueへの一般化・人手/費用削減は今回の検証対象外。

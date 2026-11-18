@@ -58,8 +58,14 @@ try {
             const t = s.tasks[next.id];
             if (t.active || t.cancelRequested || t.state !== 'awaiting-decision' ||
                 !['behavior-failed', 'forbidden-proposal'].includes(t.receipts.at(-1)?.diagnostic)) { return false; }
-            authorizeRepair(s, next.id, { kind: 'mandatory-local-failure', head: t.head,
-              reference: `attempt-${t.attempts}-fixed-acceptance-failed` });
+            const evidence = { kind: 'mandatory-local-failure', head: t.head,
+              reference: `attempt-${t.attempts}-fixed-acceptance-failed` };
+            // Preview the same scheduler/budget checks without authorizing an impossible
+            // repair. Exhaustion must retain the failed state and produce exit 1.
+            const preview = structuredClone(s);
+            authorizeRepair(preview, next.id, evidence);
+            if (nextTask(preview, target).id !== next.id) { return false; }
+            authorizeRepair(s, next.id, evidence);
             return true;
           });
           if (repaired) { continue; }

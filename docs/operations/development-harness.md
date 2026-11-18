@@ -63,7 +63,7 @@ fixtureは `eligible → implementing → artifacts-ready` まで。失敗・取
 
 local-fixture modeはモデルを呼ばず手動proposalを適用する比較入口。両modeとも新しい課金処理の上限は0円。既存セッション、レビュー、導入、電力などを含む総費用は `null`（不明）のまま記録する。正の課金上限やAPI keyで実行範囲を広げる設定は持たない。
 
-レビュー成果物が1件あれば、次の作業を増やさず再開条件を返してexit 0。失敗や停止未確認はexit 1。固定headへの必須修正証拠がある場合だけ `repair` で再開できる。これはtrusted operatorからの入力で、候補やreview本文を自動で権限へ変換しない。
+レビュー成果物が1件あれば、次の作業を増やさず再開条件を返してexit 0。失敗や停止未確認はexit 1。自動修復の次attemptが回数・task/batch時間・有効期限のいずれかで実行できない場合も、失敗状態と消費済み予算を保持してexit 1とする。固定headへの必須修正証拠がある場合だけ `repair` で再開できる。これはtrusted operatorからの入力で、候補やreview本文を自動で権限へ変換しない。
 
 ## 起動
 
@@ -99,7 +99,7 @@ node scripts/development-harness/cli.mjs resume $stateDir fixture-addition
 node scripts/development-harness/cli.mjs run $stateDir local-comparison-1 (Join-Path $stateDir 'proposals.json')
 ```
 
-`cancel`だけではworkerは止まらない。`recover`は台帳のcontainer名とlabelを照合し、Docker stop/inspect後にその実体だけを削除してから枠を解放する。元controllerの遅いstartによる再起動を防ぐためで、volumeや他containerは削除しない。CLIが落ちても枠は残る。daemon障害、container不明、停止・削除の結果不明では解放しない。createの応答喪失やcontainer削除で存在を確認できない場合は、daemon復旧と実体照合を人へ引き継ぐ。ledger/lockを消して次へ進めない。lockが残った場合もwriterの終了とledger内容・active実体を確認してから復旧する。
+`cancel`だけではworkerは止まらない。local-fixtureで予約後・Docker create試行前に取消を検知した場合は、実行中のモデルもcontainerもないため、取消receiptを保存してactive枠を解放する。その後の`resume`でもattemptと消費済み予算は保持する。createを試行して結果が不明な場合は、この解放対象に含めない。`recover`は台帳のcontainer名とlabelを照合し、Docker stop/inspect後にその実体だけを削除してから枠を解放する。元controllerの遅いstartによる再起動を防ぐためで、volumeや他containerは削除しない。CLIが落ちても枠は残る。daemon障害、container不明、停止・削除の結果不明では解放しない。createの応答喪失やcontainer削除で存在を確認できない場合は、daemon復旧と実体照合を人へ引き継ぐ。ledger/lockを消して次へ進めない。lockが残った場合もwriterの終了とledger内容・active実体を確認してから復旧する。
 
 失敗修復は `repair STATE_DIR ID evidence.json` を使用する。evidenceは `kind`（`mandatory-local-failure` / `required-review-change` / `required-ci-failure`）、現在の `head`（初回失敗はnull）、元の必須条件と再現に紐付く `reference` を持つ。Optional、head違い、未確定書込み中は拒否。修正proposalを用意した後、同じrunで再検証する。
 
@@ -113,6 +113,7 @@ node scripts/development-harness/cli.mjs run $stateDir local-comparison-1 (Join-
 
 ```powershell
 node --test scripts/development-harness/state.test.mjs
+node --test scripts/development-harness/lifecycle.test.mjs
 node --test scripts/development-harness/codex.test.mjs
 # Windows＋固定CLIで明示実行。fake authだけでモデル課金なし。
 node --test scripts/development-harness/codex-runtime.test.mjs
