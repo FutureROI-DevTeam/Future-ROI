@@ -26,7 +26,7 @@ export function checkAmounts(values, label) {
   }
 }
 
-function empiricalLaw(positive) {
+export function empiricalLaw(positive) {
   const counts = new Map();
   for (const amount of positive) counts.set(amount, (counts.get(amount) ?? 0) + 1);
   return [...counts].map(([amount, count]) => [amount, count / positive.length]);

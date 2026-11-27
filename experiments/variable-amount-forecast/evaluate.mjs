@@ -64,22 +64,45 @@ function summarizeCoverage(metric, issued) {
   };
 }
 
-export function evaluate(windows) {
+export function evaluate(windows, analogCdf) {
   if (!Array.isArray(windows) || !windows.length) throw new Error('Provide at least one diary window');
-  const scores = Object.fromEntries(MODELS.map(name =>
+  const modelsToScore = analogCdf ? [...MODELS, 'analog64', 'analogBlend'] : MODELS;
+  const extraContrasts = analogCdf ? [
+    ['analogBlend', 'm1Empirical'], ['analogBlend', 'm1Plan'], ['analogBlend', 'm1Mean'],
+    ['analogBlend', 'logisticCalendarAmount'], ['analog64', 'm1Empirical'], ['analogBlend', 'analog64'],
+  ] : [];
+  function* predictions() {
+    for (const { startDate, history, future } of windows) {
+      const prediction = forecast(startDate, history);
+      if (!prediction.reason && analogCdf) {
+        const curves = prediction.curves;
+        curves.analog64 = analogCdf(startDate, history);
+        curves.analogBlend = curves.m1Empirical.map((p, day) => (p + curves.analog64[day]) / 2);
+      }
+      yield { prediction, future };
+    }
+  }
+  return scoreForecasts(predictions(), modelsToScore, [...CONTRASTS, ...extraContrasts]);
+}
+
+// All predictors have already seen only their allowed history. Score against the same
+// possible outcome for every model, including when the future diary is incomplete.
+export function scoreForecasts(rows, modelsToScore, comparisons) {
+  const scores = Object.fromEntries(modelsToScore.map(name =>
     [name, { losses: [0, 0], p50: coverage(), p80: coverage() }]));
-  const paired = CONTRASTS.map(([model, reference]) =>
+  const paired = comparisons.map(([model, reference]) =>
     ({ model, reference, differences: [0, 0], sumSquares: 0 }));
   const notIssued = {};
+  let windows = 0;
   let issued = 0;
   let ambiguous = 0;
   const reachesByH = [0, 0];
   const noArrivalLosses = [0, 0];
   const noArrivalCurve = Array(HORIZON).fill(0);
-  for (const { startDate, history, future } of windows) {
+  for (const { prediction, future } of rows) {
+    windows++;
     checkAmounts(future, 'future');
     if (future.length !== HORIZON) throw new Error('future must have exactly ' + HORIZON + ' calendar days');
-    const prediction = forecast(startDate, history);
     if (prediction.reason) {
       notIssued[prediction.reason] = (notIssued[prediction.reason] ?? 0) + 1;
       continue;
@@ -90,7 +113,7 @@ export function evaluate(windows) {
     addPair(reachesByH, bounds(arrivals.map(day => Number(day <= HORIZON))));
     addPair(noArrivalLosses, bounds(arrivals.map(day => rps(noArrivalCurve, day))));
     const losses = {};
-    for (const name of MODELS) {
+    for (const name of modelsToScore) {
       const cdf = prediction.curves[name];
       const invalid = cdf.some((p, i) => !Number.isFinite(p) || p < -1e-10 || p > 1 + 1e-10 ||
         (i > 0 && p < cdf[i - 1] - 1e-10));
@@ -127,6 +150,6 @@ export function evaluate(windows) {
     }
     return { model, reference, deltaRps: average(differences, issued), pairedApproxCI95: ci95 };
   });
-  return { windows: windows.length, issued, notIssued, ambiguous, reachesByH,
+  return { windows, issued, notIssued, ambiguous, reachesByH,
     noArrivalReferenceRps: average(noArrivalLosses, issued), models, contrasts };
 }

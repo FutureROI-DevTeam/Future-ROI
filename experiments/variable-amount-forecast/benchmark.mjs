@@ -5,8 +5,8 @@ import { evaluate } from './evaluate.mjs';
 
 const SEED = 3522026;
 const PEOPLE = 256;
-const SCENARIOS = ['constant', 'variable', 'belowPlan', 'weekend'];
-const HISTORY_DAYS = [7, 28];
+export const SCENARIOS = ['constant', 'variable', 'belowPlan', 'weekend'];
+export const HISTORY_DAYS = [7, 28];
 
 // Mulberry32. Independent seeds drive behavior and recording, so a missing row never
 // changes the simulated behavior, and all candidate models see exactly the same future.
