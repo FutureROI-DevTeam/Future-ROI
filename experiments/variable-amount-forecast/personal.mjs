@@ -3,17 +3,18 @@ import { scoreForecasts } from './evaluate.mjs';
 
 // Count future sessions with a shared Beta activity probability. A path that already
 // contains j sessions changes the probability of its next session (beta-binomial).
-export function personalForecast(history) {
+export function personalForecast(history, remaining = REMAINING) {
   checkAmounts(history, 'history');
+  if (!Number.isSafeInteger(remaining) || remaining < 1) throw new Error('remaining must be positive integer minutes');
   if (history.at(-1) === null) return { reason: 'UNKNOWN_ORIGIN' };
   const positive = history.filter(x => x > 0);
   if (!positive.length) return { reason: 'NO_OBSERVED_AMOUNT' };
   const alpha = 1 + positive.length;
   const beta = 1 + history.filter(x => x === 0).length;
-  const weights = crossingWeights(empiricalLaw(positive), REMAINING, HORIZON);
+  const weights = crossingWeights(empiricalLaw(positive), remaining, HORIZON);
   const reachedByCount = [0];
   for (const weight of weights) reachedByCount.push(reachedByCount.at(-1) + weight);
-  const fixedCount = Math.ceil(REMAINING / PLAN);
+  const fixedCount = Math.ceil(remaining / PLAN);
   let counts = [1];
   const curves = { iidPlan: [], iidEmpirical: [] };
   for (let d = 0; d < HORIZON; d++) {
