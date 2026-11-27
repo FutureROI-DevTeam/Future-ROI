@@ -1,6 +1,6 @@
 # 不規則な行動の到達予測を、別の人の日誌で再検証する
 
-週末に集中する合成日誌では、似た履歴の人の到達日を使うと誤差が減った。公開活動記録に同じモデルを適用すると、その利点は再現しなかった。そこで本人の実行日数と実量だけを使う方法も試した。公開記録の7日履歴では予測を出せた識別子が20から29に増えた。日付を出せる範囲と、その日付の確かさには別々の課題がある。[第1比較の条件とRPSの定義](README.md)・[追加比較と追試の計画](https://github.com/FutureROI-DevTeam/Future-ROI/issues/352)
+週末に集中する合成日誌では、似た履歴の人の到達日を使うと誤差が減った。公開活動記録に同じモデルを適用すると、その利点は再現しなかった。そこで本人の実行日数と実量だけを使う方法も試した。7日履歴で予測を出せた件数は、最初の活動記録では32件中20件から29件、別の研究のPMDataでは16件中5件から15件に増えた。日付を出せる範囲と、その日付の確かさには別々の課題がある。[第1比較の条件とRPSの定義](README.md)・[追加比較と追試の計画](https://github.com/FutureROI-DevTeam/Future-ROI/issues/352)
 
 ## 再実行
 
@@ -61,8 +61,8 @@ Furberg、Brinton、Keating、Ortiz（2016）のFitbit日次データを使用�
 配布元の2つのZIPを同じフォルダーに置き、そのパスを `path/to/archives` に指定する。Python 3標準ライブラリで配布版のSHA-256を検証し、IDを除いた日誌をNodeへパイプで渡す。比較結果のJSONには集計だけが入る。ZIPと個票はGitに入れない。
 
 ```sh
-python experiments/variable-amount-forecast/fitabase_windows.py path/to/archives | node experiments/variable-amount-forecast/followup.mjs analog --input -
-python experiments/variable-amount-forecast/fitabase_windows.py path/to/archives | node experiments/variable-amount-forecast/followup.mjs personal --input -
+python -B experiments/variable-amount-forecast/fitabase_windows.py path/to/archives | node experiments/variable-amount-forecast/followup.mjs analog --input -
+python -B experiments/variable-amount-forecast/fitabase_windows.py path/to/archives | node experiments/variable-amount-forecast/followup.mjs personal --input -
 python -B -m unittest discover -s experiments/variable-amount-forecast -p test_fitabase_windows.py
 ```
 
@@ -76,3 +76,23 @@ python -B -m unittest discover -s experiments/variable-amount-forecast -p test_f
 - Aの7日履歴で未来14日の記録が完全でM1も発行できた11人に限ると、半々の候補は本人の実量分布よりRPSが0.0358高かった（近似95%区間 +0.0151〜+0.0564）。完全な人への選択がある。28日の完全な13人では差は+0.0143（−0.0091〜+0.0377）。
 - Bの7日履歴では20/32件から29/32件、28日履歴では27/35件から31/35件に予測を発行できた。7日の共通20件では可能な欠測の扱いの範囲でわずかに改善したが、完全な11件での差は−0.0060（近似95%区間 −0.0305〜+0.0185）。追加9件のP80は8件で発行でき、その日までに到達したといえるのは5〜6件である。
 - ここでの設定30分と残り180分は仮定で、評価対象は機器が記録した活動分数である。本人が選んだ学習目標やFuture ROIの完了記録とは異なる。記録の事後修正も判別できない。区間は比較ごとの近似で多重比較調整はしていない。実際の利用者の目標について予測を採用するには、設定量と実量が分かる独立した日誌での再検証が残る。
+
+## PMDataでの独立確認
+
+Thambawita、Hicks、BorgliほかのPMData（2020）は、別の研究で集めた16人の活動日誌。AとBの条件を固定した後に、2020-01-30の終わりを唯一の起点として同じ14日間を追った。各人の軽度・中度・高強度の活動分数がすべて記録され、合計が正なら、中度＋高強度をその日の量とした。3系列がすべて0か、どれか1つでも欠測なら観測不明。軽度だけが正なら観測済みの0分。最初の公開データで使った正の歩数とは異なる装着の目安である。[原論文](https://doi.org/10.1145/3339825.3394926)・[著者のOSF配布](https://osf.io/vx4bk/)・[変換コード](pmdata_windows.py)
+
+OSF配布の `pmdata` フォルダー（直下に `p01`〜`p16`）を指定する。変換に使うのは各 `fitbit` 内の日別3系列だけ。元の配布に1人分の軽度活動系列がなく、計47ファイル、365,981バイトだった。変換コードはファイル名と内容から計算したSHA-256でこの配布版を確認する。使用したOSF版の同梱ライセンスはCC BY-NC 4.0で、今回公開するのは変換コードと集計値である。[OSF版のライセンス](https://osf.io/download/ywdvx/)
+
+```sh
+python -B experiments/variable-amount-forecast/pmdata_windows.py path/to/pmdata | node experiments/variable-amount-forecast/followup.mjs analog --input -
+python -B experiments/variable-amount-forecast/pmdata_windows.py path/to/pmdata | node experiments/variable-amount-forecast/followup.mjs personal --input -
+```
+
+| 履歴日数 | 履歴あり | 共通人数 | M1・設定 | M1・平均 | M1・実量分布 | A・半々 | B・本人の日数と実量 | Bの追加発行 | 追加群・設定30分 | 追加群・実量 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 7 | 16 | 5 | 0.2234 | 0.1074 | 0.0977 | 0.1675 | 0.0766 | 10 | 0.2313 | 0.0401 |
+| 28 | 16 | 10 | 0.2035 | 0.0687 | 0.0580 | 0.1284 | 0.0519 | 5 | 0.2022 | 0.0470 |
+
+- 左の5スコアは各履歴で共通に予測を出せた人のRPS。BとM1・実量分布の対応差は7日で−0.0211（近似95%区間 −0.0391〜−0.0031）、28日で−0.0061（−0.0121〜−0.0001）。Aは両方で悪化した。人数は5件と10件で、同じ集団の同じ起点であり、独立した2回の再現とは扱えない。
+- 未来14日をすべて観測できた人だけでのBの対応差は7日で−0.0099（3件、区間 −0.0301〜+0.0102）、28日で−0.0054（8件、−0.0122〜+0.0015）。全件評価では到達後の欠測などがあっても可能な到達日が一つに決まったため、欠測によるスコア幅は0だった。
+- Bは両履歴ともに16件中15件に予測を出せた。新たに出せた10件・5件はすべて、M1で休みを起点とする遷移が不足していた人だった。追加群のP80の日付までに到達したのは7日履歴で9/10件、28日履歴で2/5件。後者の5件とも14日以内には到達し、うち3件は予測した日より後だった。

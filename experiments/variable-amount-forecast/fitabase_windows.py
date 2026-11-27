@@ -1,7 +1,7 @@
 """Convert the two published Zenodo archives to anonymous evaluation windows on stdout."""
 import argparse
 import csv
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 import hashlib
 import io
 import json
@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import zipfile
 
+from daily_windows import evaluation_windows
 
 EXPORTS = (
     ("3.12.16-4.11.16", "cca5d7b1cae2370b3e1024349aa86732394129afcc84ce7b6067693ac0f4c2c6"),
@@ -48,19 +49,8 @@ def read_days(directory):
     return people
 
 
-def evaluation_windows(people):
-    for days in (7, 28):
-        start = ORIGIN - timedelta(days=days - 1)
-        for records in people.values():
-            # Inclusion depends on a row during the history, never on future availability.
-            if not any(start <= day <= ORIGIN for day in records):
-                continue
-            minutes = [records.get(start + timedelta(days=i)) for i in range(days + 14)]
-            yield {"startDate": start.isoformat(), "history": minutes[:days], "future": minutes[days:]}
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path, help="Directory containing the two original Zenodo ZIP files")
     people = read_days(parser.parse_args().directory)
-    json.dump(list(evaluation_windows(people)), sys.stdout, separators=(",", ":"))
+    json.dump(list(evaluation_windows(people, ORIGIN)), sys.stdout, separators=(",", ":"))
