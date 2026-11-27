@@ -2,19 +2,21 @@ import { possibleArrivalDays, quantileDay } from './evaluate.mjs';
 import { HORIZON } from './forecast.mjs';
 import { personalForecast } from './personal.mjs';
 
-const ORIGIN = 14;
 const GROUPS = ['restFollowed', 'noRestFollowed'];
 
 // One prediction per participant. Neither the release ID nor the future enters the forecast or its stratum.
-export function diaryCase(days, historyDays, remaining) {
-  const history = days.slice(ORIGIN - historyDays, ORIGIN);
+export function diaryCase(days, historyDays, remaining, origin = 14) {
+  if (historyDays < 1 || origin < historyDays || origin + HORIZON > days.length) {
+    throw new Error('The history and follow-up must fit inside the study calendar');
+  }
+  const history = days.slice(origin - historyDays, origin);
   const prediction = personalForecast(history, remaining);
   const raw = prediction.reason ? null : quantileDay(prediction.curves.iidEmpirical, 0.8);
   const hasRestPair = history.some((amount, i) => i > 0 && amount !== null && history[i - 1] === 0);
   return {
     group: hasRestPair ? 'restFollowed' : 'noRestFollowed',
     raw, reason: prediction.reason ?? (raw === null ? 'OUTSIDE_HORIZON' : null),
-    arrivals: possibleArrivalDays(days.slice(ORIGIN, ORIGIN + HORIZON), remaining),
+    arrivals: possibleArrivalDays(days.slice(origin, origin + HORIZON), remaining),
   };
 }
 
@@ -84,22 +86,28 @@ function scoreDates(cases, chooseOffset) {
   };
 }
 
-function compare(cases, fit) {
+function compare(cases, methods) {
   const finite = cases.filter(row => row.raw !== null);
   const reasons = {};
   for (const { reason } of cases) if (reason) reasons[reason] = (reasons[reason] ?? 0) + 1;
   return {
     participants: cases.length, noRawDate: reasons,
-    raw: scoreDates(finite, () => 0),
-    oneDay: scoreDates(finite, () => 1),
-    pooled: scoreDates(finite, () => fit.pooled.offset),
-    stratified: scoreDates(finite, group => fit.strata[group].offset),
+    ...Object.fromEntries(Object.entries(methods).map(([name, offset]) => [name, scoreDates(finite, offset)])),
+  };
+}
+
+function evaluateGroups(cases, methods) {
+  return {
+    all: compare(cases, methods),
+    ...Object.fromEntries(GROUPS.map(group => [group, compare(cases.filter(row => row.group === group), methods)])),
   };
 }
 
 export function evaluateCalibration(cases, fit) {
-  return {
-    all: compare(cases, fit),
-    ...Object.fromEntries(GROUPS.map(group => [group, compare(cases.filter(row => row.group === group), fit)])),
-  };
+  return evaluateGroups(cases, { raw: () => 0, oneDay: () => 1, pooled: () => fit.pooled.offset,
+    stratified: group => fit.strata[group].offset });
+}
+
+export function evaluateFixedDay(cases, remaining) {
+  return evaluateGroups(cases, { raw: () => 0, targeted: group => Number(remaining === 600 && group === 'noRestFollowed') });
 }

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { diaryCase, evaluateCalibration, fitCalibration } from './p80-calibration.mjs';
+import { diaryCase, evaluateCalibration, evaluateFixedDay, fitCalibration } from './p80-calibration.mjs';
 import { decodeDiaries, inCalibration, matchingDays, splitRelease } from './study-p80.mjs';
 
 const header = 'id,day,hours,studied,quality,arm,evening';
@@ -92,4 +92,31 @@ test('a date outside the horizon is withdrawn and paired loss evaluates the same
   assert.equal(report.raw.issued, 2);
   assert.deepEqual(report.stratified, { issued: 1, hits: [1, 1], rawHitsOnRetained: [0, 1],
     gainsOnRetained: [0, 1], withdrawn: 1, meanShiftDays: 1, cappedLossDelta: [-0.3, 0.2] });
+});
+
+test('a zero on a blank external questionnaire stays unknown, while a documented rest stays zero', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'study-p80-external-'));
+  const path = join(dir, 'study.RData');
+  t.after(() => { rmSync(path, { force: true }); rmdirSync(dir); });
+  const rscript = process.env.RSCRIPT || 'Rscript';
+  const fixture = 'data <- data.frame(id=1, day=0:3, time_use=c(0,0,2.5,18), control_beliefs=c(NA,4,NA,NA),' +
+    'value_beliefs=NA, procrastination=NA, goal_achiev=NA, goal_achiev1=NA, goal_achiev2=NA);' +
+    'save(data, file=commandArgs(TRUE)[1])';
+  execFileSync(rscript, ['--vanilla', '-e', fixture, path]);
+  const adapter = fileURLToPath(new URL('./study-diary.R', import.meta.url));
+  const csv = execFileSync(rscript, ['--vanilla', adapter, 'liborius', path], { encoding: 'utf8' });
+  const release = decodeDiaries(csv, 'recordedHoursOnly', 154);
+  assert.deepEqual(release.diaries.get('1').slice(0, 4), [null, 0, 150, null]);
+  assert.equal(release.audit.unknownDays, 152);
+});
+
+test('the external rule changes only the fixed target and history group, including at the later origin', () => {
+  const cases = [row(3, [4]), row(3, [4], 'restFollowed')];
+  assert.deepEqual(evaluateFixedDay(cases, 180).all.targeted.hits, [0, 0]);
+  assert.deepEqual(evaluateFixedDay(cases, 600).all.targeted.hits, [1, 1]);
+  const diary = Array(154).fill(60);
+  diary[28] = 600;
+  assert.deepEqual(diaryCase(diary, 28, 600, 28).arrivals, [1]);
+  assert.deepEqual(diaryCase(diary, 7, 600, 14).arrivals, [10]);
+  assert.throws(() => diaryCase(diary, 28, 600, 14), /calendar/);
 });

@@ -2,11 +2,12 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { diaryCase, evaluateCalibration, fitCalibration } from './p80-calibration.mjs';
+import { diaryCase, evaluateCalibration, evaluateFixedDay, fitCalibration } from './p80-calibration.mjs';
 
 const DIGESTS = {
   longer: 'a1ca29477341999aaa58fea1c216e29acb9407d1c976f7d2aac8137873dc24af',
   gap: '64c9e5a724912cdd0234e69d7d481ae1be376b0ffff54cd10b41e9e1d31c14e7',
+  liborius: '5f7449d85ba0cace37f82e4895a4f0138e086b153a27d163085643c65ca2499c',
 };
 const adapter = fileURLToPath(new URL('./study-diary.R', import.meta.url));
 const protocol = 'FutureROI-study-P80-v1';
@@ -35,8 +36,8 @@ function observation(hours, studied, quality, evening, restPolicy) {
 }
 
 // Counts and total minutes by day identify duplicate study arms without linking individual records.
-function recordDay(totals, arm, day, hours) {
-  if (!totals.has(arm)) totals.set(arm, Array.from({ length: 30 }, () => [0, 0, 0, 0]));
+function recordDay(totals, arm, day, hours, calendarDays) {
+  if (!totals.has(arm)) totals.set(arm, Array.from({ length: calendarDays }, () => [0, 0, 0, 0]));
   const counts = totals.get(arm)[day - 1];
   counts[0]++;
   if (hours === null) return;
@@ -49,7 +50,7 @@ export function matchingDays(a, b) {
   return a.filter((counts, i) => counts.every((value, j) => value === b[i][j])).length;
 }
 
-export function decodeDiaries(csv, restPolicy = 'includeRestFlag') {
+export function decodeDiaries(csv, restPolicy = 'includeRestFlag', calendarDays = 30) {
   const [header, ...lines] = csv.trimEnd().split(/\r?\n/);
   if (header !== 'id,day,hours,studied,quality,arm,evening') throw new Error('Incorrect diary columns');
   const participants = new Map();
@@ -63,14 +64,14 @@ export function decodeDiaries(csv, restPolicy = 'includeRestFlag') {
     const [id, dayField, hoursField, studiedField, qualityField, armField, eveningField] = fields;
     if (fields.length !== 7 || !/^\d+$/.test(id)) throw new Error('Invalid participant row');
     const day = Number(dayField);
-    if (!Number.isInteger(day) || day < 1 || day > 30) throw new Error('Invalid study day');
+    if (!Number.isInteger(day) || day < 1 || day > calendarDays) throw new Error('Invalid study day');
     const studied = numberOrNull(studiedField);
     if (![null, 0, 1].includes(studied)) throw new Error('Invalid study flag');
     const hours = numberOrNull(hoursField);
     const arm = numberOrNull(armField);
     if (arms.has(id) && arms.get(id) !== arm) throw new Error('Inconsistent study arm');
     arms.set(id, arm);
-    recordDay(dailyTotals, arm, day, hours);
+    recordDay(dailyTotals, arm, day, hours, calendarDays);
     const evening = numberOrNull(eveningField);
     if (evening !== 0 && evening !== 1) throw new Error('Invalid evening response flag');
     const [minutes, reason] = observation(hours, studied, numberOrNull(qualityField), evening, restPolicy);
@@ -90,7 +91,7 @@ export function decodeDiaries(csv, restPolicy = 'includeRestFlag') {
   let observedDays = 0;
   let restDays = 0;
   for (const [id, dates] of participants) {
-    const days = Array.from({ length: 30 }, (_, i) => {
+    const days = Array.from({ length: calendarDays }, (_, i) => {
       const amount = dates.get(i + 1);
       return typeof amount === 'number' ? amount : null;
     });
@@ -99,8 +100,8 @@ export function decodeDiaries(csv, restPolicy = 'includeRestFlag') {
     diaries.set(id, days);
   }
   return { diaries, arms, dailyTotals, audit: { participants: diaries.size, rows: lines.length, reasons, duplicateRows,
-    conflictingDates: conflicts, absentDates: 30 * diaries.size - (lines.length - duplicateRows),
-    observedDays, restDays, unknownDays: 30 * diaries.size - observedDays } };
+    conflictingDates: conflicts, absentDates: calendarDays * diaries.size - (lines.length - duplicateRows),
+    observedDays, restDays, unknownDays: calendarDays * diaries.size - observedDays } };
 }
 
 function readRelease(source, path, restPolicy) {
@@ -110,7 +111,7 @@ function readRelease(source, path, restPolicy) {
     { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
   if (run.error) throw run.error;
   if (run.status !== 0) throw new Error('R diary adapter failed for ' + source + ': ' + run.stderr.trim());
-  return decodeDiaries(run.stdout, restPolicy);
+  return decodeDiaries(run.stdout, restPolicy, source === 'liborius' ? 154 : 30);
 }
 
 export function splitRelease(release) {
@@ -127,9 +128,11 @@ export function splitRelease(release) {
 }
 
 function run([longerPath, gapPath, ...options]) {
+  if (longerPath === '--liborius' && gapPath && !options.length) return externalStudy(gapPath);
   const policies = new Map([['--recorded-hours-only', 'recordedHoursOnly'], ['--evening-response', 'withEveningResponse']]);
   if (!longerPath || !gapPath || options.length > 1 || (options.length && !policies.has(options[0]))) {
-    throw new Error('Usage: study-p80.mjs <longer.RData> <gap.csv> [--recorded-hours-only | --evening-response]');
+    throw new Error('Usage: study-p80.mjs <longer.RData> <gap.csv> [--recorded-hours-only | --evening-response]' +
+      ' or study-p80.mjs --liborius <data_project2.RData>');
   }
   const restPolicy = policies.get(options[0]) ?? 'includeRestFlag';
   const longer = readRelease('longer', longerPath, restPolicy);
@@ -156,6 +159,18 @@ function run([longerPath, gapPath, ...options]) {
     split: { calibration: training.length, holdout: holdout.length,
       calibrationWithoutControl: trainingWithoutControl.length, holdoutWithoutControl: holdoutWithoutControl.length,
       control: gap.diaries.size }, scenarios };
+}
+
+function externalStudy(path) {
+  const { diaries, audit } = readRelease('liborius', path, 'recordedHoursOnly');
+  const scenarios = [];
+  for (const [origin, historyDays] of [[14, 7], [14, 14], [28, 28]]) {
+    for (const remaining of [180, 600]) {
+      const cases = [...diaries.values()].map(days => diaryCase(days, historyDays, remaining, origin));
+      scenarios.push({ origin, historyDays, remaining, ...evaluateFixedDay(cases, remaining) });
+    }
+  }
+  return { protocol: protocol + '-external-fixed-day', audit, scenarios };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
